@@ -3,7 +3,7 @@
   "sha256": "874c0249322163d2cd2583efd9b1866cc714eb6147eac411f0a2a49847b5df65",
   "source": {
     "path": "src/automation.js",
-    "origin": "Current tested VTT runtime copy"
+    "origin": "Current tested complete VTT runtime copy"
   },
   "upstream": {
     "repository": "https://github.com/tanis90/arcanedesk-fvtt-mods",
@@ -14,7 +14,7 @@
     "status": "manually-reviewed",
     "reviewedOn": "2026-11-02",
     "refreshPolicy": "manual-only",
-    "note": "Never refresh this hash automatically in CI. A changed source must be reviewed for the spell-only projection boundary before this baseline is updated."
+    "note": "Never refresh this hash automatically in CI. This is the complete runtime baseline; it is wrapped as a full initializer without hook or API projection."
   },
   "differences": [
     {

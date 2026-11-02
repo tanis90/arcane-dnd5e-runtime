@@ -4,7 +4,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {hashString} from '../packages/automation-contracts/src/semantics.mjs';
 
-export const PACKAGE_NAMES = ['automation-contracts', 'spell-compiler', 'spell-runtime'];
+export const PACKAGE_NAMES = ['automation-contracts', 'spell-compiler', 'dnd5e-runtime'];
 
 const IGNORED_REPOSITORY_DIRS = new Set(['.git', 'node_modules']);
 const FORBIDDEN_EXTENSIONS = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|bmp|tiff?|mp3|wav|ogg|flac|mp4|webm|mov|woff2?|ttf|otf|pdf|zip|tar|gz|7z|db|sqlite|sqlite3|wasm)$/i;
@@ -82,6 +82,9 @@ async function publishableFiles(packageDir, files) {
 async function verifyRuntimeManifest(packageDir, source, artifact) {
   const manifest = JSON.parse(await readFile(path.join(packageDir, 'dist/manifest.json'), 'utf8'));
   assert.equal(manifest.contentPolicy, 'runtime-only');
+  assert.equal(manifest.runtimeKind, 'full');
+  assert.equal(manifest.factoryName, 'initializeDnd5eRuntime');
+  assert.equal(manifest.artifact.path, 'dist/dnd5e-runtime.mjs');
   assert.equal(manifest.sourceHash, hashString(source.toString('utf8')));
   assert.equal(manifest.buildHash, hashString(artifact.toString('utf8')));
   assert.equal(manifest.artifact.sha256, manifest.buildHash);
@@ -105,13 +108,13 @@ export async function auditPackage(root, name) {
   assert.equal(packed.version, packageJson.version);
   for (const relative of packedFiles) await checkFile(packageDir, relative, {allowTests: false});
 
-  if (name === 'spell-runtime' || name === 'automation-contracts') {
+  if (name === 'dnd5e-runtime' || name === 'automation-contracts') {
     assert.equal(packageJson.engines.node, '>=22.12', `${packageJson.name} runtime engine floor`);
   }
-  if (name === 'spell-runtime') {
+  if (name === 'dnd5e-runtime') {
     const [source, artifact] = await Promise.all([
       readFile(path.join(packageDir, 'src/automation.js')),
-      readFile(path.join(packageDir, 'dist/spell-runtime.mjs')),
+      readFile(path.join(packageDir, 'dist/dnd5e-runtime.mjs')),
     ]);
     verifyRuntimeManifest(packageDir, source, artifact);
   }

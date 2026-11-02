@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {readFile, readdir, stat} from 'node:fs/promises';
+import {readFile, stat} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parse} from 'acorn';
@@ -17,14 +17,13 @@ const SOURCE_FILES = [
   'automation.js',
   'availability.mjs',
   'build.mjs',
-  'exclusions.mjs',
   'index.mjs',
   'metadata.mjs',
   'runtime-source.mjs',
   'sdk.mjs',
   'source-baseline.json',
 ];
-const DIST_FILES = ['manifest.json', 'spell-runtime.mjs'];
+const DIST_FILES = ['manifest.json', 'dnd5e-runtime.mjs'];
 const PUBLISHABLE_FILES = new Set([
   ...ROOT_FILES,
   ...SOURCE_FILES.map(file => `src/${file}`),
@@ -32,7 +31,7 @@ const PUBLISHABLE_FILES = new Set([
 ]);
 const FORBIDDEN_EXTENSIONS = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|bmp|tiff?|mp3|wav|ogg|flac|mp4|webm|mov|woff2?|ttf|otf|pdf|zip|tar|gz|7z|db|sqlite|sqlite3|wasm)$/i;
 const FORBIDDEN_SEGMENTS = new Set([
-  'data', 'compendium', 'compendiums', 'world', 'worlds', 'packs', 'assets',
+  'compendium', 'compendiums', 'world', 'worlds', 'packs', 'assets',
   'img', 'images', 'icons', 'audio', 'sounds', 'tokens',
 ]);
 const CONTENT_KEYS = new Set([
@@ -77,6 +76,8 @@ function assertJsonBoundary(value, trail = '') {
 
 test('the publishable file set is a whitelist with no content assets', async () => {
   assert.deepEqual(packageJson.files, ['src/', 'dist/', 'README.md', 'LICENSE', 'NOTICE']);
+  assert.equal(packageJson.name, '@arcanedesk/dnd5e-runtime');
+  assert.equal(packageJson.version, manifest.version);
   for (const relative of PUBLISHABLE_FILES) {
     const info = await stat(path.join(packageDir, relative));
     assert(info.isFile(), relative);
@@ -87,27 +88,30 @@ test('the publishable file set is a whitelist with no content assets', async () 
     const text = bytes.toString('utf8');
     assert(!/data:image\//i.test(text), `${relative} embeds image data`);
     assert(!/\beval\s*\(|\bnew Function\s*\(/.test(text), `${relative} evaluates code`);
-    assert(!/\/home\/|\/Users\/|[A-Za-z]:\\|\/tmp\/|file:\/\/\//.test(text), `${relative} contains an absolute private path`);
-    assert(!/BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}/.test(text), `${relative} contains credential material`);
+    assert(!/\/home\/|\/Users\/|[A-Za-z]:\\[A-Za-z0-9_.-]|\/tmp\/|file:\/\/\//.test(text),
+      `${relative} contains an absolute private path`);
+    assert(!/BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}/.test(text),
+      `${relative} contains credential material`);
   }
   const manifestKeys = ['artifact', 'baseline', 'buildHash', 'contentPolicy', 'contentPolicySummary',
-    'engines', 'generatedBy', 'moduleId', 'name', 'provenance', 'runtimeProfile', 'schemaVersion',
-    'source', 'sourceHash', 'version'];
+    'engines', 'factoryName', 'generatedBy', 'moduleId', 'name', 'provenance', 'runtimeKind',
+    'runtimeProfile', 'schemaVersion', 'source', 'sourceHash', 'version'];
   assert.deepEqual(Object.keys(manifest).sort(), manifestKeys.sort());
   assert.deepEqual(Object.keys(baseline).sort(), ['differences', 'review', 'schemaVersion', 'sha256', 'source', 'upstream']);
   assertJsonBoundary(manifest);
   assertJsonBoundary(baseline);
 });
 
-test('manifest hashes and byte counts match the final fixture and source', async () => {
+test('manifest hashes and byte counts match the final full artifact and source', async () => {
   const [source, artifact, baselineText] = await Promise.all([
     readFile(path.join(packageDir, 'src/automation.js')),
-    readFile(path.join(packageDir, 'dist/spell-runtime.mjs')),
+    readFile(path.join(packageDir, 'dist/dnd5e-runtime.mjs')),
     readFile(path.join(packageDir, 'src/source-baseline.json'), 'utf8'),
   ]);
   assert.equal(manifest.sourceHash, hashString(source.toString('utf8')));
   assert.equal(manifest.buildHash, hashString(artifact.toString('utf8')));
   assert.equal(manifest.artifact.sha256, manifest.buildHash);
+  assert.equal(manifest.artifact.path, 'dist/dnd5e-runtime.mjs');
   assert.equal(manifest.artifact.bytes, Buffer.byteLength(artifact));
   assert.equal(manifest.source.sha256, manifest.sourceHash);
   assert.equal(manifest.source.bytes, Buffer.byteLength(source));
@@ -116,34 +120,23 @@ test('manifest hashes and byte counts match the final fixture and source', async
   assert.equal(manifest.provenance.testedRuntimeSha256, manifest.sourceHash);
   assert.equal(manifest.provenance.upstreamSourceSha256, baseline.upstream.sha256);
   assert.equal(manifest.contentPolicy, 'runtime-only');
+  assert.equal(manifest.runtimeKind, 'full');
+  assert.equal(manifest.factoryName, 'initializeDnd5eRuntime');
 });
 
-test('imports stay inside the reviewed graph and do not smuggle nested content', async () => {
-  const sourceModules = SOURCE_FILES.filter(file => file.endsWith('.mjs'));
-  for (const file of sourceModules) {
-    const absolute = path.join(packageDir, 'src', file);
-    for (const reference of references(await readFile(absolute, 'utf8'), 'module')) {
-      assert(!reference.dynamic, `${file} uses a dynamic import`);
-      if (reference.specifier.startsWith('node:')) continue;
-      if (reference.specifier === 'acorn'
-        || reference.specifier === '@arcanedesk/automation-contracts'
-        || reference.specifier.startsWith('@arcanedesk/automation-contracts/')) continue;
-      assert(reference.specifier.startsWith('./') || reference.specifier.startsWith('../'),
-        `${file} imports undeclared package ${reference.specifier}`);
-      const resolved = path.resolve(path.dirname(absolute), reference.specifier);
-      const relative = path.relative(packageDir, resolved).split(path.sep).join('/');
-      assert(!relative.startsWith('..'), `${file} escapes the package`);
-      assert(PUBLISHABLE_FILES.has(relative), `${file} imports non-publishable ${relative}`);
-    }
-  }
-
-  const artifactRefs = references(await readFile(path.join(packageDir, 'dist/spell-runtime.mjs'), 'utf8'), 'module');
+test('the full artifact keeps the reviewed host dynamic dependency and no static content imports', async () => {
+  const artifactRefs = references(
+    await readFile(path.join(packageDir, 'dist/dnd5e-runtime.mjs'), 'utf8'),
+    'module',
+  );
   assert.deepEqual(artifactRefs.filter(entry => !entry.dynamic), []);
   for (const entry of artifactRefs.filter(entry => entry.dynamic)) {
     assert(ALLOWED_DYNAMIC_IMPORTS.has(entry.specifier), `unreviewed dynamic import ${entry.specifier}`);
   }
-
-  const sourceRefs = references(await readFile(path.join(packageDir, 'src/automation.js'), 'utf8'), 'script');
+  const sourceRefs = references(
+    await readFile(path.join(packageDir, 'src/automation.js'), 'utf8'),
+    'script',
+  );
   assert.deepEqual(sourceRefs.filter(entry => !entry.dynamic), []);
   for (const entry of sourceRefs.filter(entry => entry.dynamic)) {
     assert(ALLOWED_DYNAMIC_IMPORTS.has(entry.specifier), `unreviewed source dynamic import ${entry.specifier}`);

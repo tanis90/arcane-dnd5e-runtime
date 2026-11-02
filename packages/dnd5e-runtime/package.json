@@ -1,13 +1,13 @@
 {
-  "name": "@arcanedesk/spell-runtime-sdk",
+  "name": "@arcanedesk/dnd5e-runtime",
   "version": "0.1.0",
   "type": "module",
   "license": "Apache-2.0",
-  "description": "Runtime-only Auto 2014 spell automation SDK with a locked browser initializer",
+  "description": "Complete DND5E 2014 automation runtime SDK with a locked browser initializer",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tanis90/arcane-spell-runtime.git",
-    "directory": "packages/spell-runtime"
+    "url": "https://github.com/tanis90/arcane-dnd5e-runtime.git",
+    "directory": "packages/dnd5e-runtime"
   },
   "sideEffects": false,
   "engines": {
@@ -17,7 +17,7 @@
     ".": "./src/index.mjs",
     "./build": "./src/build.mjs",
     "./availability": "./src/availability.mjs",
-    "./dist/spell-runtime.mjs": "./dist/spell-runtime.mjs",
+    "./dist/dnd5e-runtime.mjs": "./dist/dnd5e-runtime.mjs",
     "./dist/manifest.json": "./dist/manifest.json",
     "./package.json": "./package.json"
   },

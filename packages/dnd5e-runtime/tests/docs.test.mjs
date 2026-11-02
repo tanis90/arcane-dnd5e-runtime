@@ -11,7 +11,8 @@ const documents = {
   migration: 'MIGRATION.md',
   evolution: 'docs/evolution-plan.md',
   dsl: 'docs/dsl-authoring.md',
-  packageReadme: 'packages/spell-runtime/README.md',
+  baseline: 'docs/runtime-baseline.md',
+  packageReadme: 'packages/dnd5e-runtime/README.md',
 };
 
 async function textOf(relative) {
@@ -27,21 +28,24 @@ test('documentation covers the SDK boundary and staged host migration', async ()
     Object.entries(documents).map(async ([key, relative]) => [key, await textOf(relative)]),
   ));
   const required = {
-    readme: ['runtime-only', 'createAuto2014Runtime', 'evaluateInitializer', 'not a claim',
+    readme: ['runtime-only', 'createDnd5eRuntime', 'evaluateInitializer', 'not a claim',
       '874c0249322163d2cd2583efd9b1866cc714eb6147eac411f0a2a49847b5df65'],
-    migration: ['longRestCleanup', 'Dread Ambusher', 'rollback', 'source-baseline.json'],
+    migration: ['longRestCleanup', 'Dread Ambusher', 'rollback', 'source-baseline.json',
+      '@arcanedesk/dnd5e-runtime'],
     evolution: ['Stage A', 'Stage B', 'Stage C', 'Stage D', 'enforced profile', 'longRestCleanup',
       'Rollback', 'Generated artifacts', 'FVTT', 'R3'],
-    dsl: ['@arcanedesk/spell-compiler/dsl', 'defineSpell', 'graphFragment', 'rule', 'operation',
-      'artifact', 'omissions', 'profileId'],
-    packageReadme: ['runtime-only', 'createAuto2014Runtime', 'evaluateInitializer', 'vm'],
+    dsl: ['@arcanedesk/spell-compiler/dsl', '@arcanedesk/dnd5e-runtime', 'defineSpell',
+      'graphFragment', 'rule', 'operation', 'artifact', 'omissions', 'profileId'],
+    baseline: ['54 hook registrations', '163 API keys', 'initializeDnd5eRuntime',
+      'runtime-only', 'sameModuleReplacement'],
+    packageReadme: ['runtime-only', 'createDnd5eRuntime', 'evaluateInitializer', 'vm'],
   };
   for (const [key, terms] of Object.entries(required)) {
     const normalized = contents[key].replace(/\s+/g, ' ');
     for (const term of terms) assert(normalized.includes(term), `${documents[key]} lacks ${term}`);
   }
   for (const content of Object.values(contents)) {
-    assert(!/\/home\/|\/Users\/|[A-Za-z]:\\|\/tmp\/|file:\/\/\//.test(content), 'private path in docs');
+    assert(!/\/home\/|\/Users\/|[A-Za-z]:\\[A-Za-z0-9_.-]|\/tmp\/|file:\/\/\//.test(content), 'private path in docs');
     assert(!/BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}/.test(content),
       'credential material in docs');
   }

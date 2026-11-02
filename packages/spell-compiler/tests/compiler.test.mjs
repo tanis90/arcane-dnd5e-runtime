@@ -8,7 +8,7 @@ import {
 } from '@arcanedesk/spell-compiler';
 import {contentRef, defineSpell, graphFragment} from '@arcanedesk/spell-compiler/dsl';
 import {describeSpellRequirements} from '@arcanedesk/automation-contracts/requirements';
-import {createRuntimeAvailability} from '../../spell-runtime/src/index.mjs';
+import {createRuntimeAvailability} from '../../dnd5e-runtime/src/index.mjs';
 import {forgeSpark, forgeSparkSourceItem} from './fixtures/forge-spark.mjs';
 
 const MODULE_ID = 'arcane-dnd5e-2014-automation';

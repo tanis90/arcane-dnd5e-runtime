@@ -1,7 +1,9 @@
 {
-  "name": "@arcanedesk/spell-runtime-sdk",
+  "name": "@arcanedesk/dnd5e-runtime",
   "version": "0.1.0",
   "schemaVersion": 1,
+  "runtimeKind": "full",
+  "factoryName": "initializeDnd5eRuntime",
   "runtimeProfile": {
     "id": "arcane-dnd5e-2014",
     "version": 1,
@@ -14,7 +16,7 @@
   "engines": {
     "node": ">=22.12"
   },
-  "moduleId": "arcane-spells-2014",
+  "moduleId": "arcane-dnd5e-2014-automation",
   "source": {
     "path": "src/automation.js",
     "bytes": 780657,
@@ -22,23 +24,23 @@
   },
   "sourceHash": "874c0249322163d2cd2583efd9b1866cc714eb6147eac411f0a2a49847b5df65",
   "artifact": {
-    "path": "dist/spell-runtime.mjs",
-    "bytes": 680155,
-    "sha256": "fe44f590648f0d285fc8eb6e6647c3fdc63813f0656cc2d25d05230b88d88819"
+    "path": "dist/dnd5e-runtime.mjs",
+    "bytes": 784469,
+    "sha256": "fd2f1bd007838258432aec5ba59d745cb3c0ed7a46f54009e50925a554933526"
   },
-  "buildHash": "fe44f590648f0d285fc8eb6e6647c3fdc63813f0656cc2d25d05230b88d88819",
+  "buildHash": "fd2f1bd007838258432aec5ba59d745cb3c0ed7a46f54009e50925a554933526",
   "contentPolicy": "runtime-only",
-  "contentPolicySummary": "Runtime mechanics only; no spell descriptions, compendium documents, images, translations or world state.",
+  "contentPolicySummary": "Complete DND5E 2014 runtime mechanics only; no spell descriptions, compendium documents, images, translations or world state.",
   "baseline": {
     "path": "src/source-baseline.json",
-    "sha256": "cb82504050b8ae153d80ca6cd4f3cda620214f3bac5962deda414d11f9bc0f47",
+    "sha256": "1fd47fd100000134a6b441aba3faaee7191208cec572baca41e41d6745f714c7",
     "refreshPolicy": "manual-only"
   },
   "provenance": {
     "upstreamRepository": "https://github.com/tanis90/arcanedesk-fvtt-mods",
     "upstreamCommit": "f91719cf19cc8208e7568c6d31b1e18c3e43deab",
     "upstreamSourceSha256": "83e5edbe453ea0e8e61e9a95852c2fc8a4ff746c996f93bec7c51f56d509c54d",
-    "testedRuntimeOrigin": "Current tested VTT runtime copy",
+    "testedRuntimeOrigin": "Current tested complete VTT runtime copy",
     "testedRuntimeSha256": "874c0249322163d2cd2583efd9b1866cc714eb6147eac411f0a2a49847b5df65",
     "reviewedDifferences": [
       "longRestCleanup compatibility shim",

@@ -1,7 +1,8 @@
 # Authoring mechanisms with the spell compiler DSL
 
 The repository includes the mechanism DSL, compiler and emitter in
-`@arcanedesk/spell-compiler`. It is the same `@arcanedesk/spell-compiler/dsl`
+`@arcanedesk/spell-compiler`, and one complete DND5E runtime in
+`@arcanedesk/dnd5e-runtime`. It is the same `@arcanedesk/spell-compiler/dsl`
 entry used by the public source, not a second authoring language. The compiler
 turns a definition into a plan/projection; the runtime consumes the emitted
 `runtimePlan`. Authors do not need to know module IDs, Midi-QOL/DAE flags or
@@ -127,7 +128,7 @@ import {
   emitSpellAutomationItem,
 } from '@arcanedesk/spell-compiler';
 import {describeSpellRequirements} from '@arcanedesk/automation-contracts/requirements';
-import {createRuntimeAvailability} from '@arcanedesk/spell-runtime-sdk';
+import {createRuntimeAvailability} from '@arcanedesk/dnd5e-runtime';
 import {forgeSpark, forgeSparkSourceItem} from './fixtures/forge-spark.mjs';
 
 const plan = compileSpellPlan(forgeSpark);

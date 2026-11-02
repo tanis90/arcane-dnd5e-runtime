@@ -6,7 +6,7 @@
   "description": "Browser-safe automation contracts shared by the spell compiler and runtime",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tanis90/arcane-spell-runtime.git",
+    "url": "https://github.com/tanis90/arcane-dnd5e-runtime.git",
     "directory": "packages/automation-contracts"
   },
   "engines": {

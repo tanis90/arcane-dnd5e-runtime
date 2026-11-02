@@ -2,4 +2,4 @@
 
 # The reviewed projection removes AST nodes and leaves indentation-only lines.
 # This is generated output; never hand-edit it. Exempt only its whitespace check.
-packages/spell-runtime/dist/spell-runtime.mjs -whitespace
+packages/dnd5e-runtime/dist/dnd5e-runtime.mjs -whitespace

@@ -1,18 +1,10 @@
-export function initializeSpellRuntime({moduleId = 'arcane-spells-2014'} = {}) {
+export function initializeDnd5eRuntime({moduleId = 'arcane-dnd5e-2014-automation'} = {}) {
     const HOST_MODULE_ID = moduleId;
-    function readSharedAutomationFlag(document, key) {
-      return key.split('.').reduce((value, part) => value?.[part], document?.flags?.['arcane-dnd5e-2014-automation']);
-    }
-    function writeSharedAutomationFlag(document, key, value) {
-      return document.update({['flags.arcane-dnd5e-2014-automation.' + key]: value});
-    }
-    function deleteSharedAutomationFlag(document, key) {
-      const parts = key.split('.'); const leaf = parts.pop();
-      return document.update({['flags.arcane-dnd5e-2014-automation.' + (parts.length ? parts.join('.') + '.' : '') + '-=' + leaf]: null});
-    }
     const legacy = globalThis.game?.modules?.get('arcane-dnd5e-2014-automation');
-    if (legacy?.active) return {mode: 'legacy', get api() {return legacy.api;}};
-    const key = Symbol.for('arcanedesk.spell-runtime.v1');
+    const host = globalThis.game?.modules?.get(moduleId);
+    const sameModuleReplacement = moduleId === 'arcane-dnd5e-2014-automation' && host === legacy;
+    if (legacy?.active && !sameModuleReplacement) return {mode: 'legacy', get api() {return legacy.api;}};
+    const key = Symbol.for('arcanedesk.dnd5e-runtime.v1');
     if (globalThis[key]) return globalThis[key];
     const registered = [], nativeHooks = globalThis.Hooks;
     let readyStarted = false;
@@ -21,12 +13,16 @@ export function initializeSpellRuntime({moduleId = 'arcane-spells-2014'} = {}) {
       on(name, callback) {const id = nativeHooks.on(name, callback); registered.push([name, id ?? callback]); return id;},
       once(name, callback) {const wrapped = name === 'ready' ? (...args) => {readyStarted = true; return callback(...args);} : callback;
         const id = nativeHooks.once(name, wrapped); registered.push([name, id ?? wrapped]); return id;},
+      off(name, id) {
+        if (typeof nativeHooks.off === 'function') nativeHooks.off(name, id);
+        const index = registered.findIndex(([registeredName, registeredId]) => registeredName === name && registeredId === id);
+        if (index >= 0) registered.splice(index, 1);
+      },
       callAll: (...args) => nativeHooks.callAll(...args),
       call: (...args) => nativeHooks.call(...args),
     };
     try {
       const MODULE_ID = "arcane-dnd5e-2014-automation";
-
 const NATIVE_SUMMON_MARKER_KEYS = Object.freeze([
   "provider",
   "humanStep",
@@ -39,143 +35,135 @@ const NATIVE_SUMMON_MARKER_KEYS = Object.freeze([
   "cleanup",
   "uniqueness",
 ]);
-
 const NATIVE_SUMMON_INVOCATIONS = new Map();
-
 let NATIVE_SUMMON_COMBAT_CLEANUP_QUEUE = Promise.resolve();
-
 const NATIVE_SUMMON_CONTROL_VERSION = 1;
-
 const NATIVE_SUMMON_CONTROL_RECEIPTS_FLAG = "nativeSummonControlReceipts";
-
 const NATIVE_SUMMON_CONTROL_ACTOR_QUEUES = new Map();
-
 const NATIVE_SUMMON_LIFECYCLE_VERSION = 1;
-
 const NATIVE_SUMMON_LIFECYCLE_DELETIONS = new Set();
-
 const NATIVE_SUMMON_LIFECYCLE_TASKS = new Map();
-
 const PER_SPELL_DAMAGE_TRANSACTION_VERSION = 2;
-
 const PER_SPELL_DAMAGE_PENDING_FLAG = "perSpellDamageTransactionsPending";
-
 const PER_SPELL_DAMAGE_COMPLETED_FLAG = "perSpellDamageTransactionsCompleted";
-
 const PER_SPELL_DAMAGE_ACTOR_QUEUES = new Map();
-
 const PER_SPELL_DAMAGE_WORKFLOWS = new Map();
-
+const VOW_OF_ENMITY_IDENTIFIER = "channel-divinity-vow-of-enmity";
+const VOW_OF_ENMITY_FLAG = "vowOfEnmity";
+const VOW_OF_ENMITY_SOURCE = "arcane-vow-of-enmity";
 const DIVINE_SMITE_IDENTIFIER = "divine-smite";
-
 const SNEAK_ATTACK_IDENTIFIER = "sneak-attack";
-
+const SNEAK_ATTACK_DAMAGE_FORMULA = "@scale.rogue.sneak-attack";
+const AURA_OF_PROTECTION_IDENTIFIER = "aura-of-protection";
+const DUELING_IDENTIFIER = "fighting-style-dueling";
+const GREAT_WEAPON_FIGHTING_IDENTIFIER = "fighting-style-great-weapon-fighting";
+const VIGILANT_BLESSING_IDENTIFIER = "vigilant-blessing";
+const BARDIC_INSPIRATION_IDENTIFIER = "bardic-inspiration";
+const FONT_OF_INSPIRATION_IDENTIFIER = "font-of-inspiration";
+const SONG_OF_REST_IDENTIFIER = "song-of-rest";
+const COUNTERCHARM_IDENTIFIER = "countercharm";
+const BARDIC_INSPIRATION_FLAG = "bardicInspiration";
+const COUNTERCHARM_FLAG = "countercharm";
 const BG3_SHORT_RESTS_USED_FLAG = "bg3ShortRestsUsed";
-
 const TWILIGHT_SANCTUARY_IDENTIFIER = "channel-divinity-twilight-sanctuary";
-
 const TWILIGHT_SANCTUARY_RADIUS_FEET = 30;
-
 const TWILIGHT_SANCTUARY_RING_FILE = "jb2a.extras.tmfx.border.circle.simple.01";
-
 const TWILIGHT_SANCTUARY_RING_TINT = "#6f9dff";
-
 const TWILIGHT_SANCTUARY_RING_NAME_PREFIX = "arcane-twilight-sanctuary-ring:";
-
+const TURN_UNDEAD_IDENTIFIER = "channel-divinity-turn-undead";
+const DESTROY_UNDEAD_IDENTIFIER = "destroy-undead";
 const DREAD_AMBUSHER_IDENTIFIER = "dread-ambusher";
-
+const DREAD_AMBUSHER_RIDER_FLAG = "dreadAmbusherRider";
+const AASIMAR_REVELATION_DAMAGE_IDENTIFIER = "aasimar-revelation-damage";
+const AASIMAR_REVELATION_FLAG = "aasimarRevelation";
+const AASIMAR_NECROTIC_SHROUD_IDENTIFIER = "aasimar-necrotic-shroud";
+const AASIMAR_RADIANT_CONSUMPTION_IDENTIFIER = "aasimar-radiant-consumption";
+const AASIMAR_RADIANT_SOUL_IDENTIFIER = "aasimar-radiant-soul";
+const FEY_ANCESTRY_IDENTIFIER = "fey-ancestry";
+const DWARVEN_RESILIENCE_IDENTIFIER = "dwarven-resilience";
+const HALFLING_BRAVE_IDENTIFIER = "halfling-brave";
+const GNOME_CUNNING_IDENTIFIER = "gnome-cunning";
+const DROW_SUNLIGHT_SENSITIVITY_IDENTIFIER = "drow-sunlight-sensitivity";
+const SAVAGE_ATTACKS_IDENTIFIER = "savage-attacks";
 const BLOOD_SEEKING_IDENTIFIER = "blood-seeking";
-
+const SAVAGE_ATTACKER_IDENTIFIER = "phb-savage-attacker";
+const GREAT_WEAPON_MASTER_IDENTIFIER = "phb-great-weapon-master";
+const SHARPSHOOTER_IDENTIFIER = "phb-sharpshooter";
+const VAMPIRE_REGENERATION_FLAG = "vampireRegenerationSuppressed";
+const VAMPIRE_REGENERATION_HEAL = 10;
 const DAMAGE_SUMMARY_FLAG = "damageSummary";
-
 const DAMAGE_SUMMARY_TYPE = "damage-summary";
-
 const PENDING_DAMAGE_SEGMENTS = new Map();
-
 const DAMAGE_SUMMARY_TIMERS = new Map();
-
 const DECLARED_WEAPON_SPELL_RIDER_STATES = new WeakMap();
-
 const DECLARED_ACTIVE_BUFF_STATES = new WeakMap();
-
 const DECLARED_ACTIVE_BUFF_RESERVATIONS = new Map();
-
 const PARENT_DAMAGE_RIDER_STATES = new WeakMap();
-
 const SOURCE_ATTACK_PROXIMITY_RIDER_STATES = new WeakMap();
-
 const SOURCE_ARMED_ATTACK_TRANSFORM_STATES = new WeakMap();
-
 const SOURCE_ARMED_ATTACK_TRANSFORM_RESERVATIONS = new Map();
-
 const DAMAGE_TRIGGERED_REPEAT_SAVE_STATES = new WeakMap();
-
 const PER_SPELL_SCRIPT_REGISTRY = new Map();
-
 const PER_SPELL_SCRIPT_TRANSACTIONS = new Map();
-
 const PER_SPELL_SCRIPT_TRANSACTION_LIMIT = 4096;
-
 const PER_SPELL_SCRIPT_RECEIPT_STATUSES = new Set([
   "resolved",
   "skipped",
   "partial",
   "indeterminate",
 ]);
-
 const PER_SPELL_SCRIPT_GLOBAL = "ArcaneDnd5e2014SpellScripts";
-
 const COMPILER_ZONE_EVENT_TRIGGER_QUEUES = new Map();
-
 const COMPILER_ZONE_EVENT_ENTRY_TASKS = new Map();
-
 const COMPILER_ZONE_EVENT_ACTOR_QUEUES = new Map();
-
 const COMPILER_FOLLOWING_AURA_EVENT_TRIGGER_QUEUES = new Map();
-
 const COMPILER_FOLLOWING_AURA_EVENT_ACTOR_QUEUES = new Map();
-
 const REVERSIBLE_HP_CAPACITY_ACTOR_QUEUES = new Map();
-
 const REVERSIBLE_HP_CAPACITY_EFFECTIVE = new Map();
-
 const REVERSIBLE_HP_CAPACITY_DELETE_SNAPSHOTS = new Map();
-
 const STATUS_EFFECT_SUPPRESSION_QUEUES = new Map();
-
 const OWNED_WEAPON_ATTACK_ACTOR_QUEUES = new Map();
-
 const COMPILER_ZONE_TEMPLATE_REFRESH_TASKS = new Map();
-
 const COMPILER_WEAPON_RESISTANCE_STATES = new WeakMap();
-
 const COMPILER_PHYSICAL_SIZE_SYNC_TASKS = new Map();
-
 const COMPILER_PHYSICAL_SIZE_BASELINES = new Map();
-
 const COMPILER_NEXT_TURN_ATTACK_RESERVATIONS = new Map();
-
 const COMPILER_NEXT_TURN_ATTACK_STATES = new WeakMap();
-
 const FATAL_DAMAGE_INTERCEPTION_FLAG = "fatalDamageInterception";
-
 const FATAL_DAMAGE_INTERCEPTION_PENDING_FLAG = "fatalDamageInterceptionPending";
-
 const FATAL_DAMAGE_INTERCEPTION_VERSION = 1;
-
 const FATAL_DAMAGE_INTERCEPTION_RESERVATION_TTL_MS = 60000;
-
 const FATAL_DAMAGE_INTERCEPTION_TRANSACTION_IDS = new WeakMap();
-
 const FATAL_DAMAGE_INTERCEPTION_TRANSACTION_RESERVATIONS = new Map();
-
 const FATAL_DAMAGE_INTERCEPTION_SOURCE_RESERVATIONS = new Map();
-
 const FATAL_DAMAGE_INTERCEPTION_RESERVATION_TIMERS = new Map();
-
 const FATAL_DAMAGE_INTERCEPTION_ACTOR_QUEUES = new Map();
-
 const FATAL_DAMAGE_INTERCEPTION_FAILURE_NOTICES = new Set();
+const ACTOR_STUDIO_MODULE_ID = "foundryvtt-actor-studio";
+const ARCANE_SPELL_PACK_ID = MODULE_ID + ".spells";
+const ARCANE_RACE_PACK_ID = MODULE_ID + ".races";
+const ARCANE_RACIAL_TRAIT_PACK_ID = MODULE_ID + ".racialtraits";
+const ARCANE_BACKGROUND_PACK_ID = MODULE_ID + ".backgrounds";
+const ARCANE_FEAT_PACK_ID = MODULE_ID + ".feats";
+const ARCANE_CLASS_PACK_ID = MODULE_ID + ".classes";
+const ARCANE_SUBCLASS_PACK_ID = MODULE_ID + ".subclasses";
+const ARCANE_CLASS_FEATURE_PACK_ID = MODULE_ID + ".classfeatures";
+const LEVEL3_SPELL_CONTENT_VERSION = 4;
+const LEVEL3_SPELL_CONTENT_IDENTIFIERS = new Set([
+  "aura-of-vitality",
+  "beacon-of-hope",
+  "bestow-curse",
+  "enemies-abound",
+  "gaseous-form",
+  "incite-greed",
+  "life-transference",
+  "mass-healing-word",
+  "motivational-speech",
+  "protection-from-energy",
+  "slow",
+  "spirit-guardians",
+  "spirit-shroud-tce",
+]);
 
 Hooks.on("dae.modifySpecials", (actorType, specials) => {
   if (!["character", "npc"].includes(String(actorType))) return;
@@ -184,10 +172,269 @@ Hooks.on("dae.modifySpecials", (actorType, specials) => {
     CONST.ACTIVE_EFFECT_MODES.MULTIPLY,
   ];
 });
+const LEVEL1_2_SPELL_CONTENT_VERSION = 1;
+const LEVEL1_2_SPELL_CONTENT_IDENTIFIERS = new Set([
+  "armor-of-agathys",
+  "bane",
+  "bless",
+  "blindnessdeafness",
+  "branding-smite",
+  "command",
+  "cure-wounds",
+  "darkness",
+  "dissonant-whispers",
+  "divine-favor",
+  "faerie-fire",
+  "guiding-bolt",
+  "healing-word",
+  "heroism",
+  "hideous-laughter",
+  "hold-person",
+  "hunters-mark",
+  "inflict-wounds",
+  "lesser-restoration",
+  "magic-weapon",
+  "mirror-image",
+  "misty-step",
+  "moonbeam",
+  "pass-without-trace",
+  "prayer-of-healing",
+  "protection-from-evil-and-good",
+  "protection-from-poison",
+  "sanctuary",
+  "searing-smite",
+  "shield-of-faith",
+  "silence",
+  "sleep",
+  "thunderous-smite",
+  "warding-bond",
+  "wrathful-smite",
+  "zephyr-strike",
+]);
+const VERSIONED_SPELL_CONTENT_IDENTIFIERS = new Set([
+  ...LEVEL3_SPELL_CONTENT_IDENTIFIERS,
+  ...LEVEL1_2_SPELL_CONTENT_IDENTIFIERS,
+]);
+const DND5E_2024_BROWSER_PACK_IDS = [
+  "dnd5e.actors24",
+  "dnd5e.classes24",
+  "dnd5e.content24",
+  "dnd5e.equipment24",
+  "dnd5e.feats24",
+  "dnd5e.monsterfeatures24",
+  "dnd5e.origins24",
+  "dnd5e.spells24",
+  "dnd5e.tables24",
+];
 
 function cloneSettings(value) {
   if (globalThis.foundry?.utils?.deepClone) return foundry.utils.deepClone(value);
   return JSON.parse(JSON.stringify(value ?? {}));
+}
+
+function mergeActorStudioSources(basePackId, currentSources) {
+  const extras = Array.isArray(currentSources)
+    ? currentSources.filter(packId => packId && packId !== basePackId)
+    : [];
+  return [basePackId, ...new Set(extras)];
+}
+
+async function configureActorStudioSpellSource() {
+  if (!game.user?.isGM) return false;
+  if (!game.modules.get(ACTOR_STUDIO_MODULE_ID)?.active) return false;
+  if (!game.packs.get(ARCANE_SPELL_PACK_ID)) {
+    console.warn(`[${MODULE_ID}] Actor Studio spell source was not changed because pack ${ARCANE_SPELL_PACK_ID} is missing.`);
+    return false;
+  }
+  if (!game.packs.get(ARCANE_FEAT_PACK_ID)) {
+    console.warn(`[${MODULE_ID}] Actor Studio feat source was not changed because pack ${ARCANE_FEAT_PACK_ID} is missing.`);
+    return false;
+  }
+
+  const currentSources = game.settings.get(ACTOR_STUDIO_MODULE_ID, "compendiumSources") ?? {};
+  const nextSources = cloneSettings(currentSources);
+  const currentSpells = Array.isArray(nextSources.spells) ? nextSources.spells : [];
+  const currentBackgrounds = Array.isArray(nextSources.backgrounds) ? nextSources.backgrounds : [];
+  const currentFeats = Array.isArray(nextSources.feats) ? nextSources.feats : [];
+  const alreadyArcaneOnly = currentSpells.length === 1 && currentSpells[0] === ARCANE_SPELL_PACK_ID;
+
+  if (!alreadyArcaneOnly) {
+    nextSources.spells = [ARCANE_SPELL_PACK_ID];
+  }
+  nextSources.races = [ARCANE_RACE_PACK_ID];
+  nextSources.racialFeatures = [ARCANE_RACIAL_TRAIT_PACK_ID];
+  nextSources.classes = [ARCANE_CLASS_PACK_ID];
+  nextSources.subclasses = [ARCANE_SUBCLASS_PACK_ID];
+  nextSources.classFeatures = [ARCANE_CLASS_FEATURE_PACK_ID];
+  nextSources.features = [ARCANE_CLASS_FEATURE_PACK_ID];
+  // Background and feat sources are intentionally extensible. A GM may add a
+  // campaign supplement pack (for example Dragonlance) through Actor Studio's
+  // world-scoped source settings. Keep those packs while ensuring the Arcane
+  // baseline remains first; do not silently reset a world's selected add-ons.
+  nextSources.backgrounds = mergeActorStudioSources(ARCANE_BACKGROUND_PACK_ID, currentBackgrounds);
+  nextSources.feats = mergeActorStudioSources(ARCANE_FEAT_PACK_ID, currentFeats);
+  await game.settings.set(ACTOR_STUDIO_MODULE_ID, "compendiumSources", nextSources);
+
+  if (game.settings.get(ACTOR_STUDIO_MODULE_ID, "enableSpellSelection") !== true) {
+    await game.settings.set(ACTOR_STUDIO_MODULE_ID, "enableSpellSelection", true);
+  }
+  if (game.settings.get(ACTOR_STUDIO_MODULE_ID, "enableCustomSpellListFiltering") !== true) {
+    await game.settings.set(ACTOR_STUDIO_MODULE_ID, "enableCustomSpellListFiltering", true);
+  }
+  if (game.settings.get(ACTOR_STUDIO_MODULE_ID, "enableCustomFeatSelector") !== true) {
+    await game.settings.set(ACTOR_STUDIO_MODULE_ID, "enableCustomFeatSelector", true);
+  }
+
+  if (game.settings.settings.has("dnd5e.packSourceConfiguration")) {
+    const currentPackSources = game.settings.get("dnd5e", "packSourceConfiguration") ?? {};
+    const nextPackSources = cloneSettings(currentPackSources);
+    let changedPackSources = false;
+    for (const packId of DND5E_2024_BROWSER_PACK_IDS) {
+      if (nextPackSources[packId] === false) continue;
+      nextPackSources[packId] = false;
+      changedPackSources = true;
+    }
+    if (changedPackSources) {
+      await game.settings.set("dnd5e", "packSourceConfiguration", nextPackSources);
+    }
+  }
+
+  if (!alreadyArcaneOnly) {
+    console.info(`[${MODULE_ID}] Actor Studio spell source set to ${ARCANE_SPELL_PACK_ID}.`);
+  }
+  return true;
+}
+
+async function configureMidiQolFullAutomationSettings() {
+  if (!game.user?.isGM) return false;
+  if (!game.modules.get("midi-qol")?.active) return false;
+
+  const current = game.settings.get("midi-qol", "ConfigSettings") ?? {};
+  const next = cloneSettings(current);
+  const expected = {
+    autoApplyDamage: "yesCard",
+    autoCheckHit: "all",
+    autoCheckSaves: "all",
+    autoCompleteWorkflow: true,
+    autoItemEffects: "applyRemove",
+    autoRemoveInstantaneousTemplate: true,
+    autoRollDamage: "onHit",
+    criticalDamage: "default",
+    criticalDamageGM: "default",
+    gmAutoAttack: true,
+    gmAutoDamage: "onHit",
+    gmRemoveButtons: "all",
+    removeButtons: "all",
+    skillAbilityCheckAdvantage: true,
+  };
+  let changed = false;
+
+  for (const [key, value] of Object.entries(expected)) {
+    if (next[key] === value) continue;
+    next[key] = value;
+    changed = true;
+  }
+
+  if (changed) {
+    await game.settings.set("midi-qol", "ConfigSettings", next);
+    console.info(`[${MODULE_ID}] midi-qol full automation settings updated.`, expected);
+  }
+  return changed;
+}
+
+function classMapForActorStudio(classes) {
+  const identifiers = Array.isArray(classes) && classes.length ? classes : ["arcane-hidden"];
+  return Object.fromEntries(identifiers.map(identifier => [
+    identifier,
+    {
+      type: "class",
+      name: identifier,
+      system: { identifier },
+    },
+  ]));
+}
+
+function actorStudioClassesFromSpellDocument(doc) {
+  const flagged = doc.flags?.[MODULE_ID]?.spellClasses ?? doc._source?.flags?.[MODULE_ID]?.spellClasses;
+  if (Array.isArray(flagged)) return flagged;
+
+  const rawClasses = doc._source?.system?.classes?.value ?? doc.system?.classes?.value;
+  if (typeof rawClasses === "string" && rawClasses.trim()) {
+    const classes = rawClasses.split(",").map(value => value.trim()).filter(Boolean);
+    return classes.filter(identifier => identifier !== "arcane-hidden");
+  }
+
+  return [];
+}
+
+function annotateActorStudioSpellDocument(doc) {
+  if (!doc || doc.type !== "spell") return doc;
+  const classes = actorStudioClassesFromSpellDocument(doc);
+  const labelsClasses = classes.length ? classes : ["arcane-hidden"];
+  doc.labels ??= {};
+  Object.defineProperty(doc.labels, "classes", {
+    value: labelsClasses,
+    configurable: true,
+    enumerable: true,
+    writable: true,
+  });
+  doc._lazy ??= {};
+  doc._lazy.classes = classMapForActorStudio(classes);
+  return doc;
+}
+
+function patchActorStudioArcaneSpellPack() {
+  if (!game.modules.get(ACTOR_STUDIO_MODULE_ID)?.active) return false;
+  const pack = game.packs.get(ARCANE_SPELL_PACK_ID);
+  if (!pack || pack[MODULE_ID]?.actorStudioClassPatch) return false;
+
+  const originalGetDocuments = pack.getDocuments.bind(pack);
+  pack.getDocuments = async function arcaneGetDocumentsWithSpellClasses(...args) {
+    const docs = await originalGetDocuments(...args);
+    return docs.map(annotateActorStudioSpellDocument);
+  };
+  pack[MODULE_ID] = {
+    ...(pack[MODULE_ID] ?? {}),
+    actorStudioClassPatch: true,
+  };
+  console.info(`[${MODULE_ID}] Actor Studio Arcane spell class filtering patch installed.`);
+  return true;
+}
+
+function hideFthCharacterCreatorControl(controls) {
+  const tokenTools = controls?.tokens?.tools;
+  if (!tokenTools) return false;
+  if (tokenTools instanceof Map) return tokenTools.delete("fth-character-creator");
+  if (Object.hasOwn(tokenTools, "fth-character-creator")) {
+    delete tokenTools["fth-character-creator"];
+    return true;
+  }
+  return false;
+}
+
+function currentSceneControls() {
+  const controls = ui.controls?.controls;
+  if (controls instanceof Map) return Object.fromEntries(controls.entries());
+  if (Array.isArray(controls)) return Object.fromEntries(controls.map(control => [control.name, control]));
+  return controls ?? {};
+}
+
+function hideCurrentFthCharacterCreatorControl() {
+  const removed = hideFthCharacterCreatorControl(currentSceneControls());
+  if (!removed) return false;
+  if (typeof ui.controls.render === "function") ui.controls.render({ force: true });
+  return true;
+}
+
+function hideNativeActorCreateButton() {
+  if (!game.modules.get(ACTOR_STUDIO_MODULE_ID)?.active) return false;
+  const actorStudioButton = document.querySelector("#gas-sidebar-button");
+  const header = actorStudioButton?.closest(".directory-header");
+  const nativeCreateButton = header?.querySelector('button.create-entry[data-action="createEntry"]');
+  if (!nativeCreateButton || nativeCreateButton.hidden) return false;
+  nativeCreateButton.hidden = true;
+  nativeCreateButton.dataset.arcaneHiddenNativeActorCreate = "true";
+  return true;
 }
 
 function sourceActorUuidFromOrigin(origin) {
@@ -227,6 +474,104 @@ function compilerSourceItemUuidFromEffect(effect) {
   return null;
 }
 
+function hasVowOfEnmityMarker(targetToken, attacker) {
+  if (!targetToken?.actor || !attacker) return false;
+
+  for (const effect of targetToken.actor.effects ?? []) {
+    if (!effect?.getFlag?.(MODULE_ID, VOW_OF_ENMITY_FLAG)) continue;
+
+    const sourceActorUuid = effect.getFlag(MODULE_ID, "sourceActorUuid") ?? sourceActorUuidFromOrigin(effect.origin);
+    if (sourceActorUuid === attacker.uuid) return true;
+  }
+
+  return false;
+}
+
+function isVowOfEnmityWorkflow(workflow) {
+  return workflow?.item?.system?.identifier === VOW_OF_ENMITY_IDENTIFIER;
+}
+
+function applyVowOfEnmityAdvantage(workflow) {
+  const attacker = workflow?.actor;
+  const targets = Array.from(workflow?.targets ?? []);
+  if (!attacker || targets.length !== 1) return true;
+
+  if (!hasVowOfEnmityMarker(targets[0], attacker)) return true;
+
+  workflow.attackRollModifierTracker?.advantage?.add?.(VOW_OF_ENMITY_SOURCE, "Vow of Enmity");
+  return true;
+}
+
+function getVowMarkerEffectData(item, actor) {
+  const marker = Array.from(item?.effects ?? []).find(effect => effect.getFlag?.(MODULE_ID, VOW_OF_ENMITY_FLAG));
+  if (!marker) return null;
+
+  const data = marker.toObject();
+  delete data._id;
+  data.origin = item.uuid;
+  data.transfer = false;
+  data.disabled = false;
+  data.flags ??= {};
+  data.flags[MODULE_ID] = {
+    ...(data.flags[MODULE_ID] ?? {}),
+    vowOfEnmity: true,
+    sourceActorUuid: actor.uuid,
+  };
+  return data;
+}
+
+async function clearPriorVowMarkersForSource(sourceActorUuid) {
+  const seenActors = new Set();
+  for (const token of canvas.tokens?.placeables ?? []) {
+    const actor = token.actor;
+    if (!actor || seenActors.has(actor.uuid)) continue;
+    seenActors.add(actor.uuid);
+
+    const markers = Array.from(actor.effects ?? []).filter(effect => {
+      if (!effect.getFlag?.(MODULE_ID, VOW_OF_ENMITY_FLAG)) return false;
+      const source = effect.getFlag(MODULE_ID, "sourceActorUuid") ?? sourceActorUuidFromOrigin(effect.origin);
+      return source === sourceActorUuid;
+    });
+    if (markers.length) await actor.deleteEmbeddedDocuments("ActiveEffect", markers.map(effect => effect.id));
+  }
+}
+
+async function consumeChannelDivinity(actor) {
+  const channelDivinity = actor?.items?.find(item => item.system?.identifier === "channel-divinity");
+  const max = Number(channelDivinity?.system?.uses?.max ?? 0);
+  const spent = Number(channelDivinity?.system?.uses?.spent ?? 0);
+  if (!channelDivinity || !Number.isFinite(max) || max <= 0 || spent >= max) return false;
+
+  await channelDivinity.update({ "system.uses.spent": spent + 1 });
+  return true;
+}
+
+async function applyVowOfEnmityMarker(workflow) {
+  if (!isVowOfEnmityWorkflow(workflow)) return true;
+
+  const targets = Array.from(workflow.targets ?? []);
+  if (targets.length !== 1 || !targets[0]?.actor) {
+    console.warn(`[${MODULE_ID}] Vow of Enmity requires exactly one target.`, targets);
+    return true;
+  }
+
+  const effectData = getVowMarkerEffectData(workflow.item, workflow.actor);
+  if (!effectData) {
+    console.warn(`[${MODULE_ID}] Vow of Enmity item has no marker effect.`, workflow.item);
+    return true;
+  }
+
+  await clearPriorVowMarkersForSource(workflow.actor.uuid);
+  const [effect] = await targets[0].actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+  await consumeChannelDivinity(workflow.actor);
+  console.info(`[${MODULE_ID}] Applied Vow of Enmity marker`, {
+    source: workflow.actor.name,
+    target: targets[0].name,
+    effect: effect?.name,
+  });
+  return true;
+}
+
 function targetsFromUseConfig(workflow, usageConfig) {
   const workflowTargets = Array.from(workflow?.targets ?? []);
   if (workflowTargets.length) return workflowTargets;
@@ -245,6 +590,14 @@ function targetsFromUseConfig(workflow, usageConfig) {
   return Array.from(game.user?.targets ?? []);
 }
 
+async function applyVowOfEnmityMarkerFromUse(item, usageConfig, workflow) {
+  if (item?.system?.identifier !== VOW_OF_ENMITY_IDENTIFIER) return true;
+
+  const actor = workflow?.actor ?? item.actor;
+  const targets = targetsFromUseConfig(workflow, usageConfig);
+  return applyVowOfEnmityMarker({ actor, item, targets });
+}
+
 function actorRaceOrType(actor) {
   const details = actor?.system?.details ?? {};
   const type = details.type ?? {};
@@ -258,6 +611,17 @@ function actorRaceOrType(actor) {
     .filter(value => typeof value === "string")
     .join(" ")
     .toLowerCase();
+}
+
+function isUndeadActor(actor) {
+  return /(^|\W)(undead|\u4e0d\u6b7b)(\W|$)/i.test(actorRaceOrType(actor));
+}
+
+function classLevels(actor, identifier) {
+  const systemLevels = Number(actor?.system?.classes?.[identifier]?.levels ?? 0);
+  if (systemLevels) return systemLevels;
+  const classItem = actor?.items?.find(item => item.type === "class" && item.system?.identifier === identifier);
+  return Number(classItem?.system?.levels ?? 0);
 }
 
 function effectDataFromItem(item, predicate, actor) {
@@ -275,6 +639,20 @@ function effectDataFromItem(item, predicate, actor) {
     identifier: item?.system?.identifier,
   };
   return data;
+}
+
+async function applyFirstEffectToTargets(item, usageConfig, workflow, predicate) {
+  const actor = workflow?.actor ?? item.actor;
+  const targets = targetsFromUseConfig(workflow, usageConfig);
+  if (!actor || targets.length === 0) return true;
+  const baseData = effectDataFromItem(item, predicate, actor);
+  if (!baseData) return true;
+
+  for (const target of targets) {
+    if (!target?.actor) continue;
+    await target.actor.createEmbeddedDocuments("ActiveEffect", [baseData]);
+  }
+  return true;
 }
 
 async function removeStatusesFromTargets(item, usageConfig, workflow, statuses) {
@@ -326,6 +704,7 @@ function compilerRuntimeArtifact(item, artifactId) {
     item?.flags?.[MODULE_ID]?.spellAutomation?.runtimePlan?.artifacts ?? []
   ).find(current => current?.semanticId === artifactId) ?? null;
 }
+
 
 function nativeSummonActivityUuid(activity) {
   const direct = String(activity?.uuid ?? "").trim();
@@ -2640,6 +3019,14 @@ async function updateActorHp(actor, delta) {
   return { oldHP, newHP, hpDamage: oldHP - newHP };
 }
 
+async function rollDamageToTargets(targets, formula) {
+  const roll = await new Roll(formula).evaluate();
+  const damage = Number(roll.total ?? 0);
+  const damageList = [];
+  for (const target of targets) damageList.push(await updateActorHp(target.actor, -damage));
+  return { damage, damageList };
+}
+
 async function applyVampiricTouchHealingFromUse(item, usageConfig, workflow) {
   if (item?.system?.identifier !== "vampiric-touch") return true;
   // Compiler-owned Vampiric Touch heals via the generic
@@ -2654,6 +3041,11 @@ async function applyVampiricTouchHealingFromUse(item, usageConfig, workflow) {
     .reduce((sum, value) => sum + Math.floor(value / 2), 0);
   if (healed > 0) await updateActorHp(actor, healed);
   return true;
+}
+
+async function applyVigilantBlessingFromUse(item, usageConfig, workflow) {
+  if (item?.system?.identifier !== VIGILANT_BLESSING_IDENTIFIER) return true;
+  return applyFirstEffectToTargets(item, usageConfig, workflow, effect => effect.getFlag?.(MODULE_ID, "vigilantBlessing"));
 }
 
 function tokenMatchesActor(token, actor) {
@@ -2710,10 +3102,54 @@ function endTwilightSanctuaryRing(effectId) {
   } catch (_error) {}
 }
 
+async function applyTwilightSanctuaryFromUse(item, usageConfig, workflow) {
+  if (item?.system?.identifier !== TWILIGHT_SANCTUARY_IDENTIFIER) return true;
+  const actor = workflow?.actor ?? item.actor;
+  if (!actor) return true;
+  const token = findSourceToken(actor);
+  if (!token) return true;
+  const effectData = effectDataFromItem(item, effect => effect.getFlag?.(MODULE_ID, "twilightSanctuary"), actor);
+  if (!effectData) return true;
+  const effectActor = token.actor ?? actor;
+  for (const target of workflow?.targets ?? []) {
+    if (tokenMatchesActor(target, actor)) continue;
+    const stray = Array.from(target?.actor?.effects ?? []).filter(effect =>
+      effect.getFlag?.(MODULE_ID, "twilightSanctuary")
+      && (effect.origin === item.uuid || effect.getFlag(MODULE_ID, "sourceActorUuid") === actor.uuid)
+    );
+    if (stray.length) await target.actor.deleteEmbeddedDocuments("ActiveEffect", stray.map(effect => effect.id));
+  }
+  // Recast refreshes the marker; this also keeps the dnd5e.postUseActivity and
+  // midi completeItemUse entry points idempotent relative to each other.
+  const stale = Array.from(effectActor.effects ?? []).filter(effect =>
+    effect.getFlag?.(MODULE_ID, "twilightSanctuary")
+    && (effect.origin === item.uuid || effect.getFlag(MODULE_ID, "sourceActorUuid") === actor.uuid)
+  );
+  if (stale.length) await effectActor.deleteEmbeddedDocuments("ActiveEffect", stale.map(effect => effect.id));
+  const created = await effectActor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+  await playTwilightSanctuaryRing(token, created?.[0]?.id);
+  return true;
+}
+
 async function applyTwilightSanctuaryFromActivityUse(activity, usageConfig) {
   const item = activity?.item;
   if (item?.system?.identifier !== TWILIGHT_SANCTUARY_IDENTIFIER) return true;
   const actor = activity?.actor ?? item.actor;
+  return applyTwilightSanctuaryFromUse(item, usageConfig, { actor, targets: [] });
+}
+
+async function applyCountercharmFromUse(item, usageConfig, workflow) {
+  if (item?.system?.identifier !== COUNTERCHARM_IDENTIFIER) return true;
+  const actor = workflow?.actor ?? item.actor;
+  if (!actor) return true;
+  const token = findSourceToken(actor);
+  if (!token) return true;
+  const effectActor = token.actor ?? actor;
+  const effectData = effectDataFromItem(item, effect => effect.getFlag?.(MODULE_ID, COUNTERCHARM_FLAG), effectActor);
+  if (!effectData) return true;
+  const existing = countercharmMarkerEffect(effectActor);
+  if (existing) await effectActor.deleteEmbeddedDocuments("ActiveEffect", [existing.id]);
+  await effectActor.createEmbeddedDocuments("ActiveEffect", [effectData]);
   return true;
 }
 
@@ -2765,7 +3201,7 @@ function workflowCastLevel(item, usageConfig, workflow) {
 }
 
 function parseCompilerSelectionCardinality(activity) {
-  const interaction = readSharedAutomationFlag(activity, "interaction")
+  const interaction = activity?.getFlag?.(MODULE_ID, "interaction")
     ?? activity?.flags?.[MODULE_ID]?.interaction
     ?? null;
   const value = interaction?.selectionCardinality;
@@ -2849,6 +3285,9 @@ function compilerSelectionCardinalityFailure(message, code = "ACTION_BLOCKED") {
   return error;
 }
 
+// dnd5e deep-clones Activity usage before preUse hooks. Publish the exact
+// request identity so an agent caller can distinguish a pre-consumption block
+// from an otherwise ambiguous completeItemUse(false) without sharing objects.
 function publishArcaneActionPreflightRejection(
   activity,
   usageConfig,
@@ -2955,14 +3394,14 @@ function preflightCompilerSelectionCardinality(activity, usageConfig, workflow =
 
 function workflowSemanticActionId(workflow) {
   const activity = workflow?.activity;
-  return readSharedAutomationFlag(activity, "semanticActionId")
+  return activity?.getFlag?.(MODULE_ID, "semanticActionId")
     ?? activity?.flags?.[MODULE_ID]?.semanticActionId
     ?? null;
 }
 
 function compilerWorkflowOutcomeRuleMatchesActivity(rule, workflow) {
   const activity = workflow?.activity;
-  const semanticActionId = readSharedAutomationFlag(activity, "semanticActionId")
+  const semanticActionId = activity?.getFlag?.(MODULE_ID, "semanticActionId")
     ?? activity?.flags?.[MODULE_ID]?.semanticActionId
     ?? null;
   const requiredIdentifier = rule?.adapter?.usesActivityIdentifier;
@@ -3497,7 +3936,7 @@ async function applyRequiredSelectionEffectModifiersFromUse(
 
 function compilerInteractionTargetFilter(workflow) {
   const activity = workflow?.activity;
-  const value = readSharedAutomationFlag(activity, "interaction")
+  const value = activity?.getFlag?.(MODULE_ID, "interaction")
     ?? activity?.flags?.[MODULE_ID]?.interaction
     ?? null;
   const filter = value?.targetFilter;
@@ -3513,7 +3952,7 @@ function compilerInteractionTargetFilter(workflow) {
 
 function compilerInteractionSelectionConstraints(workflow) {
   const activity = workflow?.activity;
-  const value = readSharedAutomationFlag(activity, "interaction")
+  const value = activity?.getFlag?.(MODULE_ID, "interaction")
     ?? activity?.flags?.[MODULE_ID]?.interaction
     ?? null;
   const constraints = Array.isArray(value?.selectionConstraints)
@@ -3533,7 +3972,7 @@ function compilerInteractionSelectionConstraints(workflow) {
 
 function compilerInteractionExcludesSource(workflow) {
   const activity = workflow?.activity;
-  const interaction = readSharedAutomationFlag(activity, "interaction")
+  const interaction = activity?.getFlag?.(MODULE_ID, "interaction")
     ?? activity?.flags?.[MODULE_ID]?.interaction
     ?? null;
   if (
@@ -3743,7 +4182,7 @@ function filterCompilerWorkflowTargets(workflow, {
 }
 
 function preflightRequiredCompilerSelections(item, activity, workflow) {
-  const interaction = readSharedAutomationFlag(activity, "interaction")
+  const interaction = activity?.getFlag?.(MODULE_ID, "interaction")
     ?? activity?.flags?.[MODULE_ID]?.interaction
     ?? null;
   const definitions = Array.isArray(interaction?.requiredSelections)
@@ -4351,7 +4790,7 @@ function ownedWeaponAttackCantripFormula(expression, actor, spellItem) {
 }
 
 function resolveOwnedWeaponAttack(actor, spellItem, activity) {
-  const semanticActionId = readSharedAutomationFlag(activity, "semanticActionId")
+  const semanticActionId = activity?.getFlag?.(MODULE_ID, "semanticActionId")
     ?? activity?.flags?.[MODULE_ID]?.semanticActionId
     ?? null;
   const rule = compilerRuntimeRulesForAdapter(
@@ -4426,7 +4865,7 @@ function preflightOwnedWeaponAttack(actor, item, activity) {
     && (
       !rule.sourceActionId
       || rule.sourceActionId === (
-        readSharedAutomationFlag(activity, "semanticActionId")
+        activity?.getFlag?.(MODULE_ID, "semanticActionId")
         ?? activity?.flags?.[MODULE_ID]?.semanticActionId
       )
     )
@@ -5313,7 +5752,7 @@ async function refreshTemporaryHitPointsSourcesAtTurnStart(combat, changed) {
 }
 
 function arcaneEffectFlag(effect, key) {
-  return readSharedAutomationFlag(effect, key) ?? effect?.flags?.[MODULE_ID]?.[key];
+  return effect?.getFlag?.(MODULE_ID, key) ?? effect?.flags?.[MODULE_ID]?.[key];
 }
 
 function compilerRuntimeModifiers(effect, type = null) {
@@ -5457,7 +5896,6 @@ function effectForArcaneFlag(actor, key) {
 }
 
 const SOURCE_TARGET_DAMAGE_MIRROR_CLEANUP = new Set();
-
 const COMPILER_SOURCE_TERMINATION_QUEUES = new Map();
 
 function compilerSourceTerminationContract(effect) {
@@ -5772,7 +6210,7 @@ async function applySourceArtifactsFromUse(item, usageConfig, workflow) {
     }
     const created = await createCompilerArtifactEffect(item, sourceActor, artifactId);
     if (created) {
-      await writeSharedAutomationFlag(created, "sourceCastLevel", castLevel);
+      await created.setFlag(MODULE_ID, "sourceCastLevel", castLevel);
     }
     if (created && concentrationEffect) {
       await created.setFlag("dnd5e", "dependentOn", concentrationEffect.uuid);
@@ -5840,7 +6278,6 @@ async function applySourceArtifactDismissFromUse(item, usageConfig, workflow) {
 }
 
 const SOURCE_BOUND_ONE_SHOT_RESERVATIONS = new Map();
-
 const SOURCE_BOUND_ONE_SHOT_FLAG = "sourceBoundOneShots";
 
 function sourceBoundOneShotRules(item, semanticActionId) {
@@ -5853,7 +6290,7 @@ function sourceBoundOneShotRules(item, semanticActionId) {
 }
 
 function sourceBoundOneShotActorState(actor) {
-  const state = readSharedAutomationFlag(actor, SOURCE_BOUND_ONE_SHOT_FLAG)
+  const state = actor?.getFlag?.(MODULE_ID, SOURCE_BOUND_ONE_SHOT_FLAG)
     ?? actor?.flags?.[MODULE_ID]?.[SOURCE_BOUND_ONE_SHOT_FLAG]
     ?? {};
   if (!state || typeof state !== "object" || Array.isArray(state)) {
@@ -5862,12 +6299,21 @@ function sourceBoundOneShotActorState(actor) {
   return state;
 }
 
+function sourceBoundOneShotPrunedState(actor, state) {
+  const liveEffectIds = new Set(
+    Array.from(actor?.effects ?? []).map(effect => String(effect?.id ?? "")),
+  );
+  return Object.fromEntries(
+    Object.entries(state).filter(([effectId]) => liveEffectIds.has(effectId)),
+  );
+}
+
 function sourceBoundOneShotReservationKey(effect) {
   return String(effect?.uuid ?? effect?.id ?? "");
 }
 
 function sourceBoundOneShotAvailability(activity) {
-  return readSharedAutomationFlag(activity, "availability")
+  return activity?.getFlag?.(MODULE_ID, "availability")
     ?? activity?.flags?.[MODULE_ID]?.availability
     ?? null;
 }
@@ -5925,7 +6371,7 @@ function prepareSourceBoundOneShotConsumption(activity, usageConfig, updates) {
     usageConfig,
     usageConfig?.workflow ?? null,
   );
-  const semanticActionId = readSharedAutomationFlag(activity, "semanticActionId")
+  const semanticActionId = activity?.getFlag?.(MODULE_ID, "semanticActionId")
     ?? activity?.flags?.[MODULE_ID]?.semanticActionId
     ?? null;
   const item = activity?.item;
@@ -6038,7 +6484,7 @@ function sourceBoundOneShotExactItem(actor, item, receipt) {
 
 function sourceBoundOneShotExactEffect(effect, item, receipt) {
   if (!effect) return false;
-  const artifactIds = readSharedAutomationFlag(effect, "compilerArtifactIds")
+  const artifactIds = effect.getFlag?.(MODULE_ID, "compilerArtifactIds")
     ?? effect.flags?.[MODULE_ID]?.compilerArtifactIds
     ?? [];
   return Boolean(
@@ -6155,7 +6601,7 @@ async function applySourceBoundOneShotFromUse(item, usageConfig, workflow) {
   const resolvedItem = item ?? workflow?.activity?.item ?? workflow?.item;
   const activity = workflow?.activity ?? usageConfig?.activity ?? null;
   const semanticActionId = workflowSemanticActionId(workflow)
-    ?? readSharedAutomationFlag(activity, "semanticActionId")
+    ?? activity?.getFlag?.(MODULE_ID, "semanticActionId")
     ?? activity?.flags?.[MODULE_ID]?.semanticActionId
     ?? null;
   const contract = sourceBoundOneShotValidateActivityContract(
@@ -6747,7 +7193,7 @@ function compilerWeaponEnchantmentPreflight(actor, item, activity) {
   try {
     const semanticActionId =
       activity?.flags?.[MODULE_ID]?.semanticActionId
-      ?? readSharedAutomationFlag(activity, "semanticActionId")
+      ?? activity?.getFlag?.(MODULE_ID, "semanticActionId")
       ?? null;
     const bindings = compilerWeaponEnchantmentBindings(item, semanticActionId);
     for (const binding of bindings) {
@@ -8098,7 +8544,7 @@ async function applySleepFromUse(item, usageConfig, workflow) {
   const roll = await new Roll(String(dice) + "d8").evaluate();
   let remaining = Number(roll.total ?? 0);
   const affected = [];
-  const effectData = effectDataFromItem(item, effect => readSharedAutomationFlag(effect, "sleepEffect"), actor);
+  const effectData = effectDataFromItem(item, effect => effect.getFlag?.(MODULE_ID, "sleepEffect"), actor);
   if (effectData) {
     for (const token of targets) {
       const hp = Number(token.actor.system?.attributes?.hp?.value ?? 0);
@@ -8396,7 +8842,7 @@ function spiritShroudSourceEffect(actor) {
   return Array.from(actor?.effects ?? []).find(effect =>
     effect.disabled !== true
     && !effect.flags?.auraeffects?.fromAura
-    && (readSharedAutomationFlag(effect, "spiritShroud") === true || effect.flags?.[MODULE_ID]?.spiritShroud === true)
+    && (effect.getFlag?.(MODULE_ID, "spiritShroud") === true || effect.flags?.[MODULE_ID]?.spiritShroud === true)
   );
 }
 
@@ -12058,7 +12504,7 @@ function scheduleCompilerPhysicalSizeActorSync(actor) {
 
 function compilerSaveRollMode(workflow) {
   const activity = workflow?.activity;
-  const interaction = readSharedAutomationFlag(activity, "interaction")
+  const interaction = activity?.getFlag?.(MODULE_ID, "interaction")
     ?? activity?.flags?.[MODULE_ID]?.interaction
     ?? null;
   return String(interaction?.saveRollMode ?? "");
@@ -12427,9 +12873,9 @@ async function applySpiritShroudBlockedHealing(sourceEffect, sourceActor, target
   const actor = target?.actor;
   if (!actor) return;
   const existing = Array.from(actor.effects ?? []).filter(effect =>
-    (readSharedAutomationFlag(effect, "spiritShroudBlockedHealing") === true
+    (effect.getFlag?.(MODULE_ID, "spiritShroudBlockedHealing") === true
       || effect.flags?.[MODULE_ID]?.spiritShroudBlockedHealing === true)
-    && (readSharedAutomationFlag(effect, "sourceActorUuid") ?? effect.flags?.[MODULE_ID]?.sourceActorUuid) === sourceActor.uuid
+    && (effect.getFlag?.(MODULE_ID, "sourceActorUuid") ?? effect.flags?.[MODULE_ID]?.sourceActorUuid) === sourceActor.uuid
   );
   if (existing.length) await actor.deleteEmbeddedDocuments("ActiveEffect", existing.map(effect => effect.id));
   const sourceItem = Array.from(sourceActor.items ?? []).find(item =>
@@ -12437,7 +12883,7 @@ async function applySpiritShroudBlockedHealing(sourceEffect, sourceActor, target
   );
   const effectData = effectDataFromItem(
     sourceItem,
-    effect => readSharedAutomationFlag(effect, "spiritShroudBlockedHealing") === true,
+    effect => effect.getFlag?.(MODULE_ID, "spiritShroudBlockedHealing") === true,
     sourceActor,
   );
   if (!effectData) return;
@@ -12469,7 +12915,7 @@ async function applySpiritShroudDamageBonus(workflow) {
   const castLevel = spiritShroudCastLevel(sourceEffect);
   const baseDice = 1 + Math.floor((castLevel - 3) / 2);
   const dice = baseDice * (isCriticalHitWorkflow(workflow) ? 2 : 1);
-  const damageType = readSharedAutomationFlag(sourceEffect, "damageType")
+  const damageType = sourceEffect.getFlag?.(MODULE_ID, "damageType")
     ?? sourceEffect.flags?.[MODULE_ID]?.damageType
     ?? "radiant";
   await applyBonusDamageWorkflow(workflow, String(dice) + "d8", damageType, "Spirit Shroud (" + damageType + ")", {
@@ -12498,9 +12944,9 @@ async function applySpiritShroudTurnStart(combat, changed) {
     if (distanceBetweenTokens(sourceToken, targetToken) > 10) continue;
     if (!tokenCanSee(sourceToken, targetToken)) continue;
     const exists = Array.from(targetToken.actor.effects ?? []).some(effect =>
-      (readSharedAutomationFlag(effect, "spiritShroudSlow") === true
+      (effect.getFlag?.(MODULE_ID, "spiritShroudSlow") === true
         || effect.flags?.[MODULE_ID]?.spiritShroudSlow === true)
-      && (readSharedAutomationFlag(effect, "sourceActorUuid")
+      && (effect.getFlag?.(MODULE_ID, "sourceActorUuid")
         ?? effect.flags?.[MODULE_ID]?.sourceActorUuid) === sourceToken.actor.uuid
     );
     if (exists) continue;
@@ -12509,7 +12955,7 @@ async function applySpiritShroudTurnStart(combat, changed) {
     );
     const effectData = effectDataFromItem(
       sourceItem,
-      effect => readSharedAutomationFlag(effect, "spiritShroudSlow") === true,
+      effect => effect.getFlag?.(MODULE_ID, "spiritShroudSlow") === true,
       sourceToken.actor,
     );
     if (!effectData) continue;
@@ -12659,7 +13105,7 @@ function compilerEventTurnKey(
 }
 
 function compilerFollowingAuraEventContract(document) {
-  const contract = readSharedAutomationFlag(document, "followingAuraEventActivity")
+  const contract = document?.getFlag?.(MODULE_ID, "followingAuraEventActivity")
     ?? document?.flags?.[MODULE_ID]?.followingAuraEventActivity;
   if (
     contract?.version !== 1
@@ -12887,14 +13333,18 @@ async function executeCompilerFollowingAuraEventActivity(
   ).replace(/[^A-Za-z0-9]/g, "_");
   const turnKey = compilerEventTurnKey(noncombatEventKey);
   const triggers = foundry.utils.deepClone(
-    readSharedAutomationFlag(targetActor, "compilerFollowingAuraEventTriggers") ?? {}
+    targetActor.getFlag(MODULE_ID, "compilerFollowingAuraEventTriggers") ?? {}
   );
   for (const [key, value] of Object.entries(triggers)) {
     if (value !== turnKey) delete triggers[key];
   }
   if (triggers[sourceKey] === turnKey) return true;
   triggers[sourceKey] = turnKey;
-  await writeSharedAutomationFlag(targetActor, "compilerFollowingAuraEventTriggers", triggers);
+  await targetActor.setFlag(
+    MODULE_ID,
+    "compilerFollowingAuraEventTriggers",
+    triggers,
+  );
   try {
     const queueKey = sourceUuid + ":" + source.contract.activityIdentifier;
     const previous =
@@ -12939,11 +13389,15 @@ async function executeCompilerFollowingAuraEventActivity(
     }
   } catch (error) {
     const current = foundry.utils.deepClone(
-      readSharedAutomationFlag(targetActor, "compilerFollowingAuraEventTriggers") ?? {}
+      targetActor.getFlag(MODULE_ID, "compilerFollowingAuraEventTriggers") ?? {}
     );
     if (current[sourceKey] === turnKey) {
       delete current[sourceKey];
-      await writeSharedAutomationFlag(targetActor, "compilerFollowingAuraEventTriggers", current);
+      await targetActor.setFlag(
+        MODULE_ID,
+        "compilerFollowingAuraEventTriggers",
+        current,
+      );
     }
     throw error;
   }
@@ -13077,7 +13531,7 @@ function compilerZoneArtifactExistsBranch(contract) {
 }
 
 function compilerZoneEventContract(document) {
-  const contract = readSharedAutomationFlag(document, "zoneEventActivity")
+  const contract = document?.getFlag?.(MODULE_ID, "zoneEventActivity")
     ?? document?.flags?.[MODULE_ID]?.zoneEventActivity;
   const artifactExistsBranch = compilerZoneArtifactExistsBranch(contract);
   if (
@@ -13162,7 +13616,7 @@ function compilerZoneEventContract(document) {
 }
 
 function compilerZoneMembershipProvenance(document) {
-  const value = readSharedAutomationFlag(document, "zoneMembershipProvenance")
+  const value = document?.getFlag?.(MODULE_ID, "zoneMembershipProvenance")
     ?? document?.flags?.[MODULE_ID]?.zoneMembershipProvenance;
   if (
     value?.version !== 1
@@ -14006,14 +14460,14 @@ async function executeCompilerZoneEventActivity(
   }
   const targetActor = targetToken.actor;
   const triggers = foundry.utils.deepClone(
-    readSharedAutomationFlag(targetActor, "compilerZoneEventTriggers") ?? {}
+    targetActor.getFlag(MODULE_ID, "compilerZoneEventTriggers") ?? {}
   );
   for (const [key, value] of Object.entries(triggers)) {
     if (value !== turnKey) delete triggers[key];
   }
   if (triggers[sourceKey] === turnKey) return true;
   triggers[sourceKey] = turnKey;
-  await writeSharedAutomationFlag(targetActor, "compilerZoneEventTriggers", triggers);
+  await targetActor.setFlag(MODULE_ID, "compilerZoneEventTriggers", triggers);
 
   try {
     const queueKey = sourceUuid + ":" + phaseActivityIdentifier;
@@ -14112,11 +14566,11 @@ async function executeCompilerZoneEventActivity(
     }
   } catch (error) {
     const current = foundry.utils.deepClone(
-      readSharedAutomationFlag(targetActor, "compilerZoneEventTriggers") ?? {}
+      targetActor.getFlag(MODULE_ID, "compilerZoneEventTriggers") ?? {}
     );
     if (current[sourceKey] === turnKey) {
       delete current[sourceKey];
-      await writeSharedAutomationFlag(targetActor, "compilerZoneEventTriggers", current);
+      await targetActor.setFlag(MODULE_ID, "compilerZoneEventTriggers", current);
     }
     throw error;
   }
@@ -14330,7 +14784,7 @@ function compilerSourceTurnCheckContracts(actor, phase) {
       || effect?.active === false
       || effect?.isSuppressed === true
     ) continue;
-    const contract = readSharedAutomationFlag(effect, "sourceTurnCheck")
+    const contract = effect?.getFlag?.(MODULE_ID, "sourceTurnCheck")
       ?? effect?.flags?.[MODULE_ID]?.sourceTurnCheck;
     if (
       contract?.version !== 1
@@ -14404,14 +14858,14 @@ async function applyCompilerSourceTurnChecks(combat, changed, phase) {
       phase,
     ].join(":");
     const receipts = foundry.utils.deepClone(
-      readSharedAutomationFlag(effect, "sourceTurnCheckReceipts")
+      effect.getFlag?.(MODULE_ID, "sourceTurnCheckReceipts")
       ?? effect.flags?.[MODULE_ID]?.sourceTurnCheckReceipts
       ?? {},
     );
     if (receipts[receiptKey] === cursorKey) continue;
     const previousReceipt = receipts[receiptKey];
     receipts[receiptKey] = cursorKey;
-    await writeSharedAutomationFlag(effect, "sourceTurnCheckReceipts", receipts);
+    await effect.setFlag(MODULE_ID, "sourceTurnCheckReceipts", receipts);
     try {
       const roll = await new Roll(contract.formula).evaluate();
       const success = Number(roll.total) >= Number(contract.threshold);
@@ -14426,17 +14880,81 @@ async function applyCompilerSourceTurnChecks(combat, changed, phase) {
       });
     } catch (error) {
       const currentReceipts = foundry.utils.deepClone(
-        readSharedAutomationFlag(effect, "sourceTurnCheckReceipts") ?? {},
+        effect.getFlag?.(MODULE_ID, "sourceTurnCheckReceipts") ?? {},
       );
       if (currentReceipts[receiptKey] === cursorKey) {
         if (previousReceipt === undefined) delete currentReceipts[receiptKey];
         else currentReceipts[receiptKey] = previousReceipt;
-        await writeSharedAutomationFlag(effect, "sourceTurnCheckReceipts", currentReceipts);
+        await effect.setFlag(MODULE_ID, "sourceTurnCheckReceipts", currentReceipts);
       }
       throw error;
     }
   }
   return true;
+}
+
+function tokenHasSelfSourcedMarker(token, flagName) {
+  return Array.from(token?.actor?.effects ?? []).some(effect => {
+    if (!effect.getFlag?.(MODULE_ID, flagName)) return false;
+    return effect.getFlag(MODULE_ID, "sourceActorUuid") === token.actor?.uuid;
+  });
+}
+
+function tokenIsConscious(token) {
+  const statuses = token?.actor?.statuses;
+  if (!statuses) return true;
+  return !["dead", "unconscious", "incapacitated"].some(status => statuses.has(status));
+}
+
+function tokenIsEligibleAuraSource(sourceToken, targetToken, { markerFlag, featureIdentifier, distance = 0, disposition = "same", includeSelf = true, requireConscious = true } = {}) {
+  if (!sourceToken?.actor || !targetToken?.actor) return false;
+  if (!includeSelf && sourceToken.id === targetToken.id) return false;
+  if (requireConscious && !tokenIsConscious(sourceToken)) return false;
+  if (disposition === "same" && sourceToken.document?.disposition !== targetToken.document?.disposition) return false;
+  if (disposition === "not-hostile" && targetToken.document?.disposition === -1) return false;
+  if (markerFlag && !tokenHasSelfSourcedMarker(sourceToken, markerFlag)) return false;
+  if (featureIdentifier && !actorHasFeature(sourceToken.actor, featureIdentifier)) return false;
+  return distanceBetweenTokens(sourceToken, targetToken) <= distance;
+}
+
+function findNearbyAuraSources(targetToken, options) {
+  return Array.from(canvas.tokens?.placeables ?? []).filter(token => tokenIsEligibleAuraSource(token, targetToken, options));
+}
+
+function bestAuraSource(targetToken, options, scoreSource = () => 0) {
+  const sources = findNearbyAuraSources(targetToken, options);
+  if (!sources.length) return null;
+  return sources.reduce((best, source) => (scoreSource(source) > scoreSource(best) ? source : best), sources[0]);
+}
+
+function findNearbyCountercharmSource(targetToken) {
+  return bestAuraSource(targetToken, {
+    markerFlag: COUNTERCHARM_FLAG,
+    distance: 30,
+    disposition: "same",
+    includeSelf: true,
+    requireConscious: true,
+  });
+}
+
+function isCharmOrFearSave(config) {
+  const subject = config?.subject;
+  const item = subject?.item?.documentName === "Item" ? subject.item : null;
+  const activity = subject?.activity ?? config?.activity;
+  const text = [
+    item?.name,
+    item?.system?.identifier,
+    item?.system?.description?.value,
+    activity?.name,
+    activity?.description?.chatFlavor,
+    activity?.useConditionText,
+    activity?.effectConditionText,
+    config?.flavor,
+  ]
+    .filter(value => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+  return /charm|charmed|frightened|fear|恐慌|惊恐|恐惧|魅惑|着迷/.test(text);
 }
 
 function savingThrowContextText(config) {
@@ -14478,6 +14996,62 @@ function savingThrowItem(config) {
 
 function isPoisonSave(config) {
   return /poison|poisoned|毒|中毒/.test(savingThrowContextText(config));
+}
+
+function isCharmSave(config) {
+  return /charm|charmed|魅惑|着迷/.test(savingThrowContextText(config));
+}
+
+function isFearSave(config) {
+  return /frightened|fear|恐慌|惊恐|恐惧/.test(savingThrowContextText(config));
+}
+
+function isMagicSave(config) {
+  const item = savingThrowItem(config);
+  if (item?.type === "spell") return true;
+  if (item?.system?.properties?.has?.("mgc")) return true;
+  return /spell|magic|magical|法术|魔法/.test(savingThrowContextText(config));
+}
+
+function applyCountercharmSavingThrow(config, dialog, message) {
+  const actor = config?.subject;
+  if (!actor || !isCharmOrFearSave(config)) return;
+  const targetToken = findSourceToken(actor);
+  if (!targetToken) return;
+  const sourceToken = findNearbyCountercharmSource(targetToken);
+  if (!sourceToken) return;
+  config.advantage = true;
+  message.data ??= {};
+  message.data.flags ??= {};
+  message.data.flags[MODULE_ID] = {
+    ...(message.data.flags[MODULE_ID] ?? {}),
+    countercharm: {
+      sourceActorUuid: sourceToken.actor.uuid,
+      sourceTokenUuid: sourceToken.document.uuid,
+      sourceName: sourceToken.name,
+    },
+  };
+}
+
+function applyRacialSavingThrowAutomation(config, dialog, message) {
+  const actor = config?.subject;
+  if (!actor) return;
+  const reasons = [];
+  const ability = savingThrowAbility(config);
+  if (actorHasFeature(actor, FEY_ANCESTRY_IDENTIFIER) && isCharmSave(config)) reasons.push("Fey Ancestry");
+  if (actorHasFeature(actor, HALFLING_BRAVE_IDENTIFIER) && isFearSave(config)) reasons.push("Brave");
+  if (actorHasFeature(actor, DWARVEN_RESILIENCE_IDENTIFIER) && isPoisonSave(config)) reasons.push("Dwarven/Stout Resilience");
+  if (actorHasFeature(actor, GNOME_CUNNING_IDENTIFIER) && ["int", "wis", "cha"].includes(ability) && isMagicSave(config)) {
+    reasons.push("Gnome Cunning");
+  }
+  if (!reasons.length) return;
+  config.advantage = true;
+  message.data ??= {};
+  message.data.flags ??= {};
+  message.data.flags[MODULE_ID] = {
+    ...(message.data.flags[MODULE_ID] ?? {}),
+    racialSavingThrowAdvantage: reasons,
+  };
 }
 
 function applyProtectionFromPoisonSavingThrow(config, message) {
@@ -14555,11 +15129,311 @@ function applyTriggeredRepeatSaveRollMode(config, message) {
   };
 }
 
+function nearbyUndeadTokens(actor, distance = 30) {
+  const sourceToken = findSourceToken(actor);
+  if (!sourceToken) return Array.from(game.user?.targets ?? []).filter(target => isUndeadActor(target.actor));
+
+  return Array.from(canvas.tokens?.placeables ?? []).filter(token => {
+    if (!token?.actor || token.id === sourceToken.id) return false;
+    if (!isUndeadActor(token.actor)) return false;
+    return distanceBetweenTokens(sourceToken, token) <= distance;
+  });
+}
+
+function prepareTurnUndeadTargetsForUse(item, usageConfig) {
+  if (item?.system?.identifier !== TURN_UNDEAD_IDENTIFIER) return;
+  const targets = nearbyUndeadTokens(item.actor);
+  usageConfig.midiOptions ??= {};
+  usageConfig.midiOptions.targetsToUse = new Set(targets);
+  usageConfig.midiOptions.targetUuids = targets.map(target => target.document.uuid);
+}
+
+function prepareTwilightSanctuaryTargetsForUse(item, usageConfig) {
+  if (item?.system?.identifier !== TWILIGHT_SANCTUARY_IDENTIFIER) return;
+  const sourceToken = findSourceToken(item.actor);
+  if (!sourceToken) return;
+  usageConfig.midiOptions ??= {};
+  usageConfig.midiOptions.targetsToUse = new Set([sourceToken]);
+  usageConfig.midiOptions.targetUuids = [sourceToken.document.uuid];
+}
+
+function nearbyNonAlliedTokens(actor, distance = 10) {
+  const sourceToken = findSourceToken(actor);
+  if (!sourceToken) return Array.from(game.user?.targets ?? []).filter(target =>
+    target?.actor && target.document?.disposition !== findSourceToken(actor)?.document?.disposition
+  );
+
+  return Array.from(canvas.tokens?.placeables ?? []).filter(token => {
+    if (!token?.actor || token.id === sourceToken.id) return false;
+    if (token.document?.disposition === sourceToken.document?.disposition) return false;
+    return distanceBetweenTokens(sourceToken, token) <= distance;
+  });
+}
+
+function prepareAasimarNecroticShroudTargetsForUse(item, usageConfig) {
+  if (item?.system?.identifier !== AASIMAR_NECROTIC_SHROUD_IDENTIFIER) return;
+  const targets = nearbyNonAlliedTokens(item.actor, 10);
+  usageConfig.midiOptions ??= {};
+  usageConfig.midiOptions.targetsToUse = new Set(targets);
+  usageConfig.midiOptions.targetUuids = targets.map(target => target.document.uuid);
+}
+
+function turnUndeadFailedSaveTargets(workflow) {
+  const failed = workflow?.failedSaves;
+  if (failed instanceof Set) return Array.from(failed);
+  if (Array.isArray(failed)) return failed;
+  return [];
+}
+
+function destroyUndeadThreshold(actor) {
+  if (!actorHasFeature(actor, DESTROY_UNDEAD_IDENTIFIER)) return null;
+  const clericLevels = classLevels(actor, "cleric");
+  if (clericLevels >= 17) return 4;
+  if (clericLevels >= 14) return 3;
+  if (clericLevels >= 11) return 2;
+  if (clericLevels >= 8) return 1;
+  if (clericLevels >= 5) return 0.5;
+  return null;
+}
+
+function actorChallengeRating(actor) {
+  const cr = actor?.system?.details?.cr;
+  if (typeof cr === "number") return cr;
+  if (typeof cr === "string") {
+    const fraction = cr.match(/^\s*(\d+)\s*\/\s*(\d+)\s*$/);
+    if (fraction) return Number(fraction[1]) / Number(fraction[2]);
+    const parsed = Number(cr);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+async function destroyUndeadTarget(target) {
+  const actor = target?.actor;
+  if (!actor) return;
+  await actor.update({ "system.attributes.hp.value": 0 });
+  const defeated = CONFIG.specialStatusEffects?.DEFEATED ?? "dead";
+  if (CONFIG.statusEffects?.some(status => status.id === defeated)) {
+    await actor.toggleStatusEffect(defeated, { active: true });
+  }
+}
+
+async function applyTurnedUndeadEffect(item, actor, target) {
+  const effectData = effectDataFromItem(item, effect => effect.getFlag?.(MODULE_ID, "turnedUndead"), actor);
+  if (!effectData || !target?.actor) return;
+  await target.actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+}
+
+async function applyTurnUndeadFromWorkflow(workflow) {
+  if (workflow?.item?.system?.identifier !== TURN_UNDEAD_IDENTIFIER) return true;
+  const actor = workflow.actor;
+  const threshold = destroyUndeadThreshold(actor);
+  for (const target of turnUndeadFailedSaveTargets(workflow)) {
+    if (!target?.actor || !isUndeadActor(target.actor)) continue;
+    const cr = actorChallengeRating(target.actor);
+    if (threshold !== null && cr !== null && cr <= threshold) {
+      await destroyUndeadTarget(target);
+    } else {
+      await applyTurnedUndeadEffect(workflow.item, actor, target);
+    }
+  }
+  return true;
+}
+
+function actorHasFeature(actor, identifier) {
+  const normalizedIdentifier = String(identifier ?? "").toLowerCase();
+  return actor?.items?.some(item => {
+    const itemIdentifier = String(item.system?.identifier ?? "").toLowerCase();
+    const itemName = String(item.name ?? "").toLowerCase();
+    return itemIdentifier === normalizedIdentifier || itemName.includes(normalizedIdentifier.replaceAll("-", " "));
+  });
+}
+
+function bardicInspirationItem(actor) {
+  return actor?.items?.find(item => item.system?.identifier === BARDIC_INSPIRATION_IDENTIFIER);
+}
+
+function bardicInspirationDie(actor) {
+  const levels = classLevels(actor, "bard");
+  if (levels >= 15) return "1d12";
+  if (levels >= 10) return "1d10";
+  if (levels >= 5) return "1d8";
+  return "1d6";
+}
+
+function activeBardicInspirationEffect(actor) {
+  return Array.from(actor?.effects ?? []).find(effect => effect.getFlag?.(MODULE_ID, BARDIC_INSPIRATION_FLAG));
+}
+
+function countercharmMarkerEffect(actor) {
+  return Array.from(actor?.effects ?? []).find(effect => effect.getFlag?.(MODULE_ID, COUNTERCHARM_FLAG));
+}
+
+async function clearBardicInspirationEffect(actor) {
+  const existing = activeBardicInspirationEffect(actor);
+  if (existing) await actor.deleteEmbeddedDocuments("ActiveEffect", [existing.id]);
+}
+
+async function grantBardicInspiration(sourceIdentifier, targetIdentifier, config = {}) {
+  const sourceActor = resolveWorldActor(sourceIdentifier);
+  const targetActor = resolveWorldActor(targetIdentifier);
+  if (!sourceActor) throw new Error(`Bard not found: ${sourceIdentifier}`);
+  if (!targetActor) throw new Error(`Target actor not found: ${targetIdentifier}`);
+  if (sourceActor.id === targetActor.id) throw new Error("Bardic Inspiration cannot target self.");
+
+  const item = bardicInspirationItem(sourceActor);
+  if (!item) throw new Error(`${sourceActor.name} does not have Bardic Inspiration.`);
+  const max = Number(item.system?.uses?.max ?? 0);
+  const spent = Number(item.system?.uses?.spent ?? 0);
+  const shouldConsume = config.consume !== false;
+  if (shouldConsume && (!Number.isFinite(max) || max <= 0 || spent >= max)) {
+    throw new Error(`${sourceActor.name} has no Bardic Inspiration uses remaining.`);
+  }
+
+  await clearBardicInspirationEffect(targetActor);
+  const die = bardicInspirationDie(sourceActor);
+  await targetActor.createEmbeddedDocuments("ActiveEffect", [{
+    name: "Bardic Inspiration",
+    img: item.img,
+    origin: item.uuid,
+    transfer: false,
+    disabled: false,
+    type: "base",
+    system: {},
+    changes: [],
+    duration: { seconds: 600 },
+    statuses: [],
+    flags: {
+      [MODULE_ID]: {
+        [BARDIC_INSPIRATION_FLAG]: true,
+        die,
+        sourceActorUuid: sourceActor.uuid,
+        sourceName: sourceActor.name,
+      },
+    },
+  }]);
+  if (shouldConsume) await item.update({ "system.uses.spent": spent + 1 });
+  return {
+    sourceActorId: sourceActor.id,
+    sourceActorName: sourceActor.name,
+    targetActorId: targetActor.id,
+    targetActorName: targetActor.name,
+    die,
+    usesSpent: shouldConsume ? spent + 1 : spent,
+    usesMax: max,
+  };
+}
+
+async function applyBardicInspirationFromUse(item, usageConfig, workflow) {
+  if (item?.system?.identifier !== BARDIC_INSPIRATION_IDENTIFIER) return true;
+  const sourceActor = workflow?.actor ?? item.actor;
+  const targets = targetsFromUseConfig(workflow, usageConfig);
+  if (!sourceActor || targets.length !== 1 || !targets[0]?.actor) return true;
+  if (targets[0].actor.id === sourceActor.id) return true;
+  await grantBardicInspiration(sourceActor.id, targets[0].actor.id, { consume: false });
+  return true;
+}
+
+async function declareBardicInspirationUse(targetIdentifier, rollType = "attack") {
+  const actor = resolveWorldActor(targetIdentifier);
+  if (!actor) throw new Error(`Actor not found: ${targetIdentifier}`);
+  const normalizedRollType = String(rollType ?? "attack").toLowerCase();
+  if (!["attack", "save", "savingThrow", "check", "abilityCheck", "any"].includes(normalizedRollType)) {
+    throw new Error(`Unsupported Bardic Inspiration roll type: ${rollType}`);
+  }
+  const effect = activeBardicInspirationEffect(actor);
+  if (!effect) throw new Error(`${actor.name} does not have Bardic Inspiration.`);
+  await effect.setFlag(MODULE_ID, "declaredRollType", normalizedRollType === "savingthrow" ? "save" : normalizedRollType);
+  return {
+    actorId: actor.id,
+    actorName: actor.name,
+    die: effect.getFlag(MODULE_ID, "die") ?? "1d6",
+    declaredRollType: normalizedRollType,
+    sourceName: effect.getFlag(MODULE_ID, "sourceName") ?? "",
+  };
+}
+
+function declaredBardicInspirationEffect(actor, rollType) {
+  const normalizedRollType = String(rollType ?? "").toLowerCase();
+  const effect = activeBardicInspirationEffect(actor);
+  if (!effect) return null;
+  const declared = String(effect.getFlag(MODULE_ID, "declaredRollType") ?? "").toLowerCase();
+  if (!declared) return null;
+  if (declared === "any" || declared === normalizedRollType) return effect;
+  if (declared === "abilitycheck" && normalizedRollType === "check") return effect;
+  return null;
+}
+
+function addBardicDieToRollConfig(config, actor, rollType, message) {
+  const effect = declaredBardicInspirationEffect(actor, rollType);
+  if (!effect) return false;
+  const die = String(effect.getFlag(MODULE_ID, "die") ?? "1d6");
+  for (const roll of config?.rolls ?? []) {
+    roll.parts ??= [];
+    roll.parts.push(die);
+  }
+  config.parts ??= [];
+  config.parts.push(die);
+  message.data ??= {};
+  message.data.flags ??= {};
+  message.data.flags[MODULE_ID] = {
+    ...(message.data.flags[MODULE_ID] ?? {}),
+    bardicInspiration: {
+      die,
+      sourceActorUuid: effect.getFlag(MODULE_ID, "sourceActorUuid") ?? null,
+      sourceName: effect.getFlag(MODULE_ID, "sourceName") ?? "",
+    },
+  };
+  actor.deleteEmbeddedDocuments("ActiveEffect", [effect.id]);
+  return true;
+}
+
+function applyBardicInspirationAttack(config, dialog, message) {
+  const actor = config?.subject?.actor ?? config?.subject?.item?.actor ?? config?.actor;
+  if (!actor) return;
+  addBardicDieToRollConfig(config, actor, "attack", message);
+}
+
+function applyBardicInspirationSavingThrow(config, dialog, message) {
+  const actor = config?.subject;
+  if (!actor) return;
+  addBardicDieToRollConfig(config, actor, "save", message);
+}
+
+async function recoverBardicInspirationOnRest(actor, result) {
+  if (!actor || result?.type !== "short") return false;
+  if (!actorHasFeature(actor, FONT_OF_INSPIRATION_IDENTIFIER)) return false;
+  const item = bardicInspirationItem(actor);
+  if (!item) return false;
+  const spent = Number(item.system?.uses?.spent ?? 0);
+  if (!spent) return false;
+  await item.update({ "system.uses.spent": 0 });
+  return true;
+}
+
 function resolveWorldActor(identifier) {
   if (!identifier) return null;
   if (identifier.documentName === "Actor") return identifier;
   if (typeof identifier !== "string") return null;
   return game.actors.get(identifier) ?? game.actors.getName(identifier) ?? null;
+}
+
+function restAutomationConfig(type) {
+  return type === "short" ? { autoHD: false } : {};
+}
+
+async function applyBg3ShortRestHealing(actor, config = {}) {
+  if (!actor || config.bg3Healing === false) return 0;
+  const hp = actor.system?.attributes?.hp;
+  if (!hp) return 0;
+  const current = Number(hp.value ?? 0);
+  const max = Number(hp.effectiveMax ?? hp.max ?? 0);
+  if (!Number.isFinite(current) || !Number.isFinite(max) || max <= 0 || current >= max) return 0;
+  const healing = Math.floor(max / 2);
+  if (healing <= 0) return 0;
+  const next = Math.min(max, current + healing);
+  await actor.update({ "system.attributes.hp.value": next });
+  return next - current;
 }
 
 function groupMemberActors(actor) {
@@ -14569,10 +15443,45 @@ function groupMemberActors(actor) {
     .filter(member => member?.documentName === "Actor");
 }
 
+function bg3ShortRestLimit(actor) {
+  const actors = actor?.type === "group" ? groupMemberActors(actor) : [actor].filter(Boolean);
+  const hasSongOfRest = actors.some(member => actorHasFeature(member, SONG_OF_REST_IDENTIFIER));
+  return 2 + (hasSongOfRest ? 1 : 0);
+}
+
+function bg3ShortRestQuota(actor) {
+  const limit = bg3ShortRestLimit(actor);
+  const rawUsed = Number(actor?.getFlag?.(MODULE_ID, BG3_SHORT_RESTS_USED_FLAG) ?? 0);
+  const used = Math.clamp(Number.isFinite(rawUsed) ? rawUsed : 0, 0, limit);
+  return {
+    used,
+    limit,
+    remaining: Math.max(limit - used, 0),
+    songOfRestAvailable: limit > 2,
+  };
+}
+
+function assertBg3ShortRestQuota(actor, config = {}) {
+  const quota = bg3ShortRestQuota(actor);
+  if (config.enforceShortRestQuota === false) return quota;
+  if (quota.remaining <= 0) {
+    throw new Error(`${actor.name} has no BG3 short rests remaining (${quota.used}/${quota.limit}). Take a long rest first.`);
+  }
+  return quota;
+}
+
+async function consumeBg3ShortRestQuota(actor, config = {}) {
+  const before = bg3ShortRestQuota(actor);
+  if (config.enforceShortRestQuota === false) return before;
+  const used = Math.min(before.used + 1, before.limit);
+  await actor.setFlag(MODULE_ID, BG3_SHORT_RESTS_USED_FLAG, used);
+  return bg3ShortRestQuota(actor);
+}
+
 async function resetBg3ShortRestQuota(actor) {
   if (!actor?.setFlag) return null;
-  await writeSharedAutomationFlag(actor, BG3_SHORT_RESTS_USED_FLAG, 0);
-  return true;
+  await actor.setFlag(MODULE_ID, BG3_SHORT_RESTS_USED_FLAG, 0);
+  return bg3ShortRestQuota(actor);
 }
 
 async function resetBg3ShortRestQuotaForTarget(actor) {
@@ -14585,11 +15494,395 @@ async function resetBg3ShortRestQuotaForTarget(actor) {
   return quota;
 }
 
+async function restGroup(identifier, type = "short", config = {}) {
+  const actor = resolveWorldActor(identifier);
+  if (!actor) throw new Error(`Group actor not found: ${identifier}`);
+  if (actor.type !== "group") throw new Error(`${actor.name} is not a group actor`);
+  if (!["short", "long"].includes(type)) throw new Error(`Unsupported rest type: ${type}`);
+  const quotaBefore = type === "short" ? assertBg3ShortRestQuota(actor, config) : null;
+  const result = await actor[`${type}Rest`]({ dialog: false, autoRest: true, ...restAutomationConfig(type), ...config });
+  const healing = [];
+  if (type === "short") {
+    for (const memberActor of groupMemberActors(actor)) {
+      const healed = await applyBg3ShortRestHealing(memberActor, config);
+      healing.push({ actorId: memberActor.id, actorName: memberActor.name, healed });
+      await recoverBardicInspirationOnRest(memberActor, { type: "short" });
+    }
+    const quotaAfter = await consumeBg3ShortRestQuota(actor, config);
+    return { type, targetId: actor.id, targetName: actor.name, targetType: "group", quotaBefore, quotaAfter, healing };
+  }
+  const quotaAfter = await resetBg3ShortRestQuotaForTarget(actor);
+  return { type, targetId: actor.id, targetName: actor.name, targetType: "group", quotaAfter, restResult: result };
+}
+
+async function restActor(identifier, type = "short", config = {}) {
+  const actor = resolveWorldActor(identifier);
+  if (!actor) throw new Error(`Actor not found: ${identifier}`);
+  if (actor.type === "group") return restGroup(actor, type, config);
+  if (!["short", "long"].includes(type)) throw new Error(`Unsupported rest type: ${type}`);
+  const quotaBefore = type === "short" ? assertBg3ShortRestQuota(actor, config) : null;
+  const result = await actor[`${type}Rest`]({ dialog: false, ...restAutomationConfig(type), ...config });
+  if (type === "short") {
+    const healed = await applyBg3ShortRestHealing(actor, config);
+    await recoverBardicInspirationOnRest(actor, { type: "short" });
+    const quotaAfter = await consumeBg3ShortRestQuota(actor, config);
+    return { type, targetId: actor.id, targetName: actor.name, targetType: "actor", quotaBefore, quotaAfter, healing: [{ actorId: actor.id, actorName: actor.name, healed }] };
+  }
+  const quotaAfter = await resetBg3ShortRestQuotaForTarget(actor);
+  return { type, targetId: actor.id, targetName: actor.name, targetType: "actor", quotaAfter, restResult: result };
+}
+
+const ARCANE_BG3_SHORT_REST_BUTTON_CLASS = "arcane-bg3-short-rest";
+
+function bg3ShortRestButtonLabel(actor) {
+  const quota = bg3ShortRestQuota(actor);
+  return "博德之门3短休 (" + quota.remaining + "/" + quota.limit + ")";
+}
+
+function updateBg3ShortRestButton(button, actor, busy = false) {
+  if (!button || !actor) return null;
+  const quota = bg3ShortRestQuota(actor);
+  const label = bg3ShortRestButtonLabel(actor);
+  button.dataset.tooltip = label;
+  button.setAttribute("aria-label", label);
+  button.setAttribute("type", "button");
+  button.disabled = busy || quota.remaining <= 0;
+  button.classList.toggle("disabled", button.disabled);
+  return quota;
+}
+
+function updateBg3ShortRestButtonsForActor(actor) {
+  if (!actor?.id) return;
+  for (const button of document.querySelectorAll("." + ARCANE_BG3_SHORT_REST_BUTTON_CLASS + "[data-actor-id='" + actor.id + "']")) {
+    updateBg3ShortRestButton(button, actor);
+  }
+}
+
+async function handleBg3ShortRestButtonClick(event, actor) {
+  event.preventDefault();
+  event.stopPropagation();
+  const button = event.currentTarget;
+  updateBg3ShortRestButton(button, actor, true);
+  button?.setAttribute("aria-busy", "true");
+  try {
+    const result = await restGroup(actor, "short");
+    const quota = result?.quotaAfter ?? bg3ShortRestQuota(actor);
+    ui.notifications?.info("博德之门3短休完成 (" + quota.remaining + "/" + quota.limit + ")");
+  } catch (error) {
+    console.warn("[" + MODULE_ID + "] BG3 short rest button failed", error);
+    ui.notifications?.error(error?.message ?? String(error));
+  } finally {
+    button?.removeAttribute("aria-busy");
+    updateBg3ShortRestButtonsForActor(actor);
+  }
+}
+
+function injectBg3ShortRestButton(app, element) {
+  const actor = app?.actor ?? app?.document;
+  if (actor?.documentName !== "Actor" || actor.type !== "group") return;
+  const root = element instanceof HTMLElement ? element : element?.[0] ?? app?.element;
+  if (!(root instanceof HTMLElement)) return;
+  const buttonRow = root.querySelector(".sheet-header-buttons");
+  if (!buttonRow) return;
+
+  let button = buttonRow.querySelector("." + ARCANE_BG3_SHORT_REST_BUTTON_CLASS);
+  if (!button) {
+    button = document.createElement("button");
+    button.classList.add(ARCANE_BG3_SHORT_REST_BUTTON_CLASS, "gold-button");
+    button.dataset.actorId = actor.id;
+    button.innerHTML = '<i class="fa-solid fa-mug-hot" inert=""></i>';
+    button.addEventListener("click", event => handleBg3ShortRestButtonClick(event, actor));
+    const nativeShortRest = buttonRow.querySelector("button.short-rest[data-action='rest'][data-type='short']");
+    nativeShortRest?.after(button);
+    if (!button.isConnected) buttonRow.append(button);
+  }
+  updateBg3ShortRestButton(button, actor);
+}
+
+function injectBg3ShortRestButtonsIntoOpenSheets() {
+  const instances = foundry.applications?.instances;
+  if (!instances?.values) return;
+  for (const app of instances.values()) injectBg3ShortRestButton(app, app.element);
+}
+
+function auraOfProtectionBonus(sourceToken) {
+  if (!sourceToken?.actor || !actorHasFeature(sourceToken.actor, AURA_OF_PROTECTION_IDENTIFIER)) return 0;
+  const cha = Number(sourceToken.actor.system?.abilities?.cha?.mod ?? 0);
+  return Math.max(1, Number.isFinite(cha) ? cha : 0);
+}
+
+function applyAuraOfProtectionSave(actor, rollData) {
+  if (!actor) return;
+  const targetToken = findSourceToken(actor);
+  if (!targetToken) return;
+  const sourceToken = bestAuraSource(targetToken, {
+    featureIdentifier: AURA_OF_PROTECTION_IDENTIFIER,
+    distance: 10,
+    disposition: "same",
+    includeSelf: true,
+    requireConscious: true,
+  }, auraOfProtectionBonus);
+  if (!sourceToken) return;
+  const bonus = auraOfProtectionBonus(sourceToken);
+  if (!bonus) return;
+
+  rollData.parts ??= [];
+  rollData.parts.push(String(bonus));
+  rollData.messageData ??= {};
+  rollData.messageData.flags ??= {};
+  rollData.messageData.flags[MODULE_ID] = {
+    ...(rollData.messageData.flags[MODULE_ID] ?? {}),
+    auraOfProtection: {
+      sourceActorUuid: sourceToken.actor.uuid,
+      sourceTokenUuid: sourceToken.document.uuid,
+      sourceName: sourceToken.name,
+      bonus,
+    },
+  };
+}
+
+function applyAuraOfProtectionSavingThrow(config, message) {
+  const actor = config?.subject;
+  if (!actor) return;
+  const targetToken = findSourceToken(actor);
+  if (!targetToken) return;
+  const sourceToken = bestAuraSource(targetToken, {
+    featureIdentifier: AURA_OF_PROTECTION_IDENTIFIER,
+    distance: 10,
+    disposition: "same",
+    includeSelf: true,
+    requireConscious: true,
+  }, auraOfProtectionBonus);
+  if (!sourceToken) return;
+  const bonus = auraOfProtectionBonus(sourceToken);
+  if (!bonus) return;
+
+  for (const roll of config.rolls ?? []) {
+    roll.parts ??= [];
+    roll.parts.push(String(bonus));
+  }
+  message.data ??= {};
+  message.data.flags ??= {};
+  message.data.flags[MODULE_ID] = {
+    ...(message.data.flags[MODULE_ID] ?? {}),
+    auraOfProtection: {
+      sourceActorUuid: sourceToken.actor.uuid,
+      sourceTokenUuid: sourceToken.document.uuid,
+      sourceName: sourceToken.name,
+      bonus,
+    },
+  };
+}
+
+function applyDreadAmbusherInitiative(combatant, rollConfig) {
+  const actor = combatant?.actor;
+  if (!actorHasFeature(actor, DREAD_AMBUSHER_IDENTIFIER)) return;
+  const wis = Number(actor.system?.abilities?.wis?.mod ?? 0);
+  if (!wis) return;
+  rollConfig.parts ??= [];
+  rollConfig.parts.push(String(wis));
+}
+
+async function applyDreadAmbusherTurnStart(combat, changed) {
+  if (!("turn" in changed)) return;
+  const combatant = combat.combatant;
+  const token = combatant?.token?.object;
+  const actor = combatant?.actor;
+  if (!token || !actorHasFeature(actor, DREAD_AMBUSHER_IDENTIFIER)) return;
+  const isFirstRound = Number(combat.round ?? 0) === 1;
+  const existing = Array.from(actor.effects ?? []).find(effect => effect.getFlag?.(MODULE_ID, "dreadAmbusherRoundOne"));
+  if (!isFirstRound && existing) {
+    await actor.deleteEmbeddedDocuments("ActiveEffect", [existing.id]);
+    return;
+  }
+  if (!isFirstRound || existing) return;
+  await actor.createEmbeddedDocuments("ActiveEffect", [{
+    name: "Dread Ambusher: Round One",
+    origin: actor.uuid,
+    transfer: false,
+    disabled: false,
+    changes: [{ key: "system.attributes.movement.walk", mode: 2, value: "10", priority: 20 }],
+    duration: { rounds: 1, turns: 1, startRound: combat.round, startTurn: combat.turn },
+    statuses: [],
+    flags: {
+      dae: { specialDuration: ["turnEnd", "combatEnd"], stackable: "noneName", showIcon: true },
+      [MODULE_ID]: { dreadAmbusherRoundOne: true },
+    },
+    img: "modules/arcane-dnd5e-2014-automation/Nicons/Ability_Ambush.png",
+    type: "base",
+    system: {},
+  }]);
+}
+
 function activityValues(item) {
   const activities = item?.system?.activities;
   if (!activities) return [];
   if (typeof activities.values === "function") return Array.from(activities.values());
   return Object.values(activities);
+}
+
+function activityHasHealingFormula(activity, formula) {
+  const parts = Array.isArray(activity?.damage?.parts)
+    ? activity.damage.parts
+    : Object.values(activity?.damage?.parts ?? {});
+  return parts.some(part => {
+    const types = Array.isArray(part?.types) ? part.types : [part?.type, part?.damageType];
+    const partFormula = String(part?.custom?.formula ?? part?.formula ?? "").trim();
+    return types.some(type => String(type ?? "").toLowerCase() === "healing") && partFormula === String(formula);
+  });
+}
+
+const VAMPIRE_REGENERATION_EXTRA_ACTOR_NAMES = new Set([
+  "瓦伦汀·维尔 valentin veyr",
+]);
+
+function actorIsVampireRegenerationCandidate(actorName) {
+  return actorName.includes("vampire spawn")
+    || actorName.includes("吸血鬼衍体")
+    || VAMPIRE_REGENERATION_EXTRA_ACTOR_NAMES.has(actorName);
+}
+
+function vampireRegenerationFeature(actor) {
+  if (!actor || actor.type !== "npc" || !isUndeadActor(actor)) return null;
+  const actorName = String(actor.name ?? "").toLowerCase();
+  if (!actorIsVampireRegenerationCandidate(actorName)) return null;
+  return actor.items?.find(item => {
+    const itemName = String(item.name ?? "").toLowerCase();
+    const identifier = String(item.system?.identifier ?? "").toLowerCase();
+    const description = String(item.system?.description?.value ?? "").toLowerCase();
+    const isRegeneration = identifier === "regeneration"
+      || itemName.includes("regeneration")
+      || itemName.includes("再生")
+      || description.includes("regains 10 hit points")
+      || description.includes("恢复 10");
+    if (!isRegeneration) return false;
+    return activityValues(item).some(activity => activityHasHealingFormula(activity, VAMPIRE_REGENERATION_HEAL))
+      || /regains\s+10\s+hit points|恢复\s*10/.test(description);
+  }) ?? null;
+}
+
+function actorHasVampireRegenerationBlocker(actor) {
+  const blockerPattern = /regeneration suppressed|no regeneration|sunlight|running water|holy water|再生.*(抑制|禁用|失效)|日光|阳光|流水|圣水/i;
+  return Array.from(actor?.effects ?? []).some(effect => {
+    const text = [
+      effect.name,
+      effect.label,
+      Array.from(effect.statuses ?? []).join(" "),
+      effect.getFlag?.(MODULE_ID, "vampireRegenerationBlocker") ? "regeneration suppressed" : "",
+    ].join(" ");
+    return blockerPattern.test(text);
+  });
+}
+
+async function consumeVampireRegenerationSuppression(actor, combat) {
+  const marker = actor?.getFlag?.(MODULE_ID, VAMPIRE_REGENERATION_FLAG);
+  if (!marker) return false;
+  await actor.unsetFlag(MODULE_ID, VAMPIRE_REGENERATION_FLAG).catch(() => undefined);
+  if (!combat || !marker.combatId) return true;
+  return marker.combatId === combat.id;
+}
+
+async function createVampireRegenerationMessage(actor, content) {
+  await ChatMessage.create({
+    user: game.user?.id,
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content,
+  });
+}
+
+async function applyVampireRegenerationTurnStart(combat, changed) {
+  if (!("turn" in changed)) return;
+  const combatant = combat.combatant;
+  const token = combatant?.token?.object;
+  const actor = combatant?.actor ?? token?.actor;
+  const feature = vampireRegenerationFeature(actor);
+  if (!token || !actor || !feature) return;
+
+  const hp = actor.system?.attributes?.hp;
+  const current = Number(hp?.value ?? 0);
+  const max = Number(hp?.max ?? hp?.effectiveMax ?? current);
+  const suppressed = await consumeVampireRegenerationSuppression(actor, combat);
+  if (suppressed || actorHasVampireRegenerationBlocker(actor)) {
+    if (current > 0 && current < max) {
+      await createVampireRegenerationMessage(actor, "<p><strong>Regeneration:</strong> suppressed this turn.</p>");
+    }
+    return;
+  }
+  if (!Number.isFinite(current) || !Number.isFinite(max) || current <= 0 || current >= max) return;
+  const result = await updateActorHp(actor, VAMPIRE_REGENERATION_HEAL);
+  const healed = Math.max(0, Number(result.newHP ?? 0) - Number(result.oldHP ?? 0));
+  if (healed > 0) {
+    await createVampireRegenerationMessage(actor, "<p><strong>Regeneration:</strong> " + actor.name + " regains " + healed + " HP.</p>");
+  }
+}
+
+function collectDamageTypes(value, output = [], seen = new WeakSet()) {
+  if (!value) return output;
+  if (typeof value === "string") {
+    output.push(value);
+    return output;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) collectDamageTypes(entry, output, seen);
+    return output;
+  }
+  if (typeof value !== "object") return output;
+  if (seen.has(value)) return output;
+  seen.add(value);
+  for (const key of ["type", "damageType", "oldType", "newType"]) {
+    if (typeof value[key] === "string") output.push(value[key]);
+  }
+  for (const key of ["damageDetail", "rawDamageDetail", "damageItem", "damageItems"]) {
+    collectDamageTypes(value[key], output, seen);
+  }
+  return output;
+}
+
+function damagePayloadText(data) {
+  const item = data?.item ?? data?.workflow?.item;
+  const damageItem = data?.damageItem;
+  return [
+    item?.name,
+    item?.system?.identifier,
+    item?.system?.description?.value,
+    data?.workflow?.item?.name,
+    data?.workflow?.item?.system?.identifier,
+    data?.workflow?.flavor,
+    data?.workflow?.itemCardData?.flavor,
+    damageItem?.name,
+    damageItem?.flavor,
+    damageItem?.type,
+    damageItem?.damageType,
+  ]
+    .filter(value => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+}
+
+function damageSuppressesVampireRegeneration(data) {
+  const damageTypes = collectDamageTypes([
+    data?.damageItem,
+    data?.damageDetail,
+    data?.rawDamageDetail,
+    data?.workflow?.damageItem,
+    data?.workflow?.damageDetail,
+    data?.workflow?.rawDamageDetail,
+  ]).map(type => String(type ?? "").toLowerCase());
+  if (damageTypes.includes("radiant")) return true;
+  return /holy water|圣水/.test(damagePayloadText(data));
+}
+
+async function suppressVampireRegenerationFromDamage(token, data) {
+  const actor = token?.actor ?? token?.document?.actor;
+  if (!actor || !game.combat || !vampireRegenerationFeature(actor)) return false;
+  if (!damageSuppressesVampireRegeneration(data)) return false;
+  await actor.setFlag(MODULE_ID, VAMPIRE_REGENERATION_FLAG, {
+    combatId: game.combat.id,
+    round: game.combat.round,
+    turn: game.combat.turn,
+    source: "radiant-or-holy-water-damage",
+  });
+  return true;
 }
 
 async function sourceItemForTriggeredEffect(
@@ -14776,6 +16069,21 @@ function declaredRider(usageConfig, workflow, identifiers) {
   );
 }
 
+function declaredDivineSmiteRider(usageConfig, workflow) {
+  return declaredRider(usageConfig, workflow, DIVINE_SMITE_IDENTIFIER);
+}
+
+function declaredSneakAttackRider(usageConfig, workflow) {
+  return declaredRider(usageConfig, workflow, SNEAK_ATTACK_IDENTIFIER);
+}
+
+function declaredDreadAmbusherRider(usageConfig, workflow) {
+  return declaredRider(usageConfig, workflow, DREAD_AMBUSHER_IDENTIFIER);
+}
+
+// Compiler-owned spell riders are intentionally not mirrored here. A missing
+// compiler contract must fail visibly instead of falling through to a partial
+// spell-id-specific implementation.
 const DECLARED_WEAPON_SPELL_RIDERS = {};
 
 function compilerRiderDamageFormula(damage, slotLevel, minSlotLevel) {
@@ -14988,6 +16296,158 @@ function weaponSpellRiderAttackAllowed(workflow, spec) {
   if (spec.attackType === "melee") return isMeleeWeaponWorkflow(workflow);
   if (spec.attackType === "ranged") return isRangedWeaponWorkflow(workflow);
   return isWeaponWorkflow(workflow);
+}
+
+function attackRollContext(configOrWorkflow) {
+  const subject = configOrWorkflow?.subject;
+  const activity = configOrWorkflow?.activity
+    ?? subject?.activity
+    ?? (subject?.type === "attack" ? subject : null);
+  const item = configOrWorkflow?.item
+    ?? activity?.item
+    ?? subject?.item
+    ?? subject?.item?.document
+    ?? null;
+  const actor = configOrWorkflow?.actor
+    ?? item?.actor
+    ?? subject?.actor
+    ?? null;
+  return { actor, item, activity };
+}
+
+function addAttackRollPart(config, part) {
+  let applied = false;
+  for (const roll of config?.rolls ?? []) {
+    roll.parts ??= [];
+    roll.parts.push(part);
+    applied = true;
+  }
+  config.parts ??= [];
+  config.parts.push(part);
+  return applied || true;
+}
+
+function isSceneSunlit(token) {
+  const scene = token?.document?.parent ?? canvas.scene;
+  const explicit = scene?.getFlag?.(MODULE_ID, "sunlight");
+  if (explicit === true) return true;
+  if (explicit === false) return false;
+  return false;
+}
+
+function applySunlightSensitivityAttack(config, dialog, message) {
+  const { actor } = attackRollContext(config);
+  if (!actorHasFeature(actor, DROW_SUNLIGHT_SENSITIVITY_IDENTIFIER)) return false;
+  if (!isSceneSunlit(findSourceToken(actor))) return false;
+  config.disadvantage = true;
+  message.data ??= {};
+  message.data.flags ??= {};
+  message.data.flags[MODULE_ID] = {
+    ...(message.data.flags[MODULE_ID] ?? {}),
+    sunlightSensitivity: true,
+  };
+  return true;
+}
+
+function propertyValues(collection) {
+  if (!collection) return [];
+  if (collection instanceof Set) return Array.from(collection);
+  if (Array.isArray(collection)) return collection;
+  if (typeof collection === "object") {
+    return Object.entries(collection)
+      .filter(([, value]) => value === true || value === "true" || value === 1)
+      .map(([key]) => key);
+  }
+  return [];
+}
+
+function itemHasProperty(item, aliases) {
+  const wanted = new Set(aliases.map(alias => String(alias).toLowerCase()));
+  return propertyValues(item?.system?.properties).some(value => wanted.has(String(value).toLowerCase()));
+}
+
+function isItemEquipped(item) {
+  return item?.system?.equipped === true || item?.system?.equipped?.value === true || item?.system?.equipped === undefined;
+}
+
+function equippedWeapons(actor) {
+  return Array.from(actor?.items ?? []).filter(item => item.type === "weapon" && isItemEquipped(item));
+}
+
+function hasOtherEquippedWeapon(actor, currentItem) {
+  return equippedWeapons(actor).some(item => item.id !== currentItem?.id);
+}
+
+function hasEquippedShield(actor) {
+  return Array.from(actor?.items ?? []).some(item => {
+    if (!isItemEquipped(item)) return false;
+    const armor = item.system?.armor ?? {};
+    const type = armor.type ?? item.system?.type?.value ?? item.system?.type;
+    return item.type === "equipment" && /shield|盾/i.test(String(type) + " " + item.name);
+  });
+}
+
+function explicitWeaponUse(workflow) {
+  const rolls = [
+    workflow?.damageRoll,
+    ...(Array.isArray(workflow?.damageRolls) ? workflow.damageRolls : []),
+  ].filter(Boolean);
+  const candidates = [
+    workflow?.options?.weaponUse,
+    workflow?.workflowOptions?.weaponUse,
+    workflow?.midiOptions?.workflowOptions?.weaponUse,
+    workflow?.attackMode,
+    workflow?.rollOptions?.attackMode,
+    workflow?.options?.attackMode,
+    workflow?.workflowOptions?.attackMode,
+    ...rolls.map(roll => roll?.options?.attackMode),
+  ].filter(value => value !== undefined && value !== null);
+
+  const versatileCandidates = [
+    workflow?.options?.versatile,
+    workflow?.workflowOptions?.versatile,
+    workflow?.midiOptions?.workflowOptions?.versatile,
+    ...rolls.map(roll => roll?.options?.versatile),
+  ];
+  if (versatileCandidates.some(value => value === true || value === "true")) return "two-handed";
+
+  for (const candidate of candidates) {
+    const value = String(candidate).toLowerCase();
+    if (["two-handed", "twohanded", "two_handed", "two handed", "versatile"].includes(value)) return "two-handed";
+    if (["one-handed", "onehanded", "one_handed", "one handed"].includes(value)) return "one-handed";
+  }
+
+  return null;
+}
+
+function isVersatileTwoHandedUse(workflow) {
+  const explicit = explicitWeaponUse(workflow);
+  if (explicit) return explicit === "two-handed";
+  const actor = workflow?.actor;
+  if (hasEquippedShield(actor)) return false;
+  if (hasOtherEquippedWeapon(actor, workflow?.item)) return false;
+  return true;
+}
+
+function isDuelingEligible(workflow) {
+  const actor = workflow?.actor;
+  const item = workflow?.item;
+  if (!actorHasFeature(actor, DUELING_IDENTIFIER)) return false;
+  if (!isMeleeWeaponWorkflow(workflow)) return false;
+  if (itemHasProperty(item, ["two", "two-handed", "twoHanded"])) return false;
+  if (hasOtherEquippedWeapon(actor, item)) return false;
+  if (itemHasProperty(item, ["ver", "versatile"]) && isVersatileTwoHandedUse(workflow)) return false;
+  return true;
+}
+
+function isGreatWeaponFightingEligible(workflow) {
+  const actor = workflow?.actor;
+  const item = workflow?.item;
+  if (!actorHasFeature(actor, GREAT_WEAPON_FIGHTING_IDENTIFIER)) return false;
+  if (!isMeleeWeaponWorkflow(workflow)) return false;
+  if (itemHasProperty(item, ["two", "two-handed", "twoHanded"])) return true;
+  if (itemHasProperty(item, ["ver", "versatile"])) return isVersatileTwoHandedUse(workflow);
+  return false;
 }
 
 function workflowDamageRolls(workflow) {
@@ -15314,7 +16774,7 @@ function damageSummarySegmentsForMessage(message, pendingSegments = []) {
 
 function damageSummaryMessagesForItemCard(itemCardId) {
   return Array.from(game.messages ?? []).filter(message =>
-    readSharedAutomationFlag(message, DAMAGE_SUMMARY_FLAG)?.parentItemCardId === itemCardId
+    message?.getFlag?.(MODULE_ID, DAMAGE_SUMMARY_FLAG)?.parentItemCardId === itemCardId
   );
 }
 
@@ -15457,9 +16917,110 @@ async function applyBonusDamageWorkflow(workflow, formula, damageType, flavor, o
   });
 }
 
+function aasimarRevelationMarker(actor) {
+  return Array.from(actor?.effects ?? []).find(effect => effect.getFlag?.(MODULE_ID, AASIMAR_REVELATION_FLAG));
+}
+
+function aasimarRevelationDamageType(effect) {
+  return effect?.getFlag?.(MODULE_ID, "damageType") ?? effect?.flags?.[MODULE_ID]?.damageType ?? null;
+}
+
+async function applyAasimarRevelationFromUse(item, usageConfig, workflow) {
+  const identifier = item?.system?.identifier;
+  if (![AASIMAR_NECROTIC_SHROUD_IDENTIFIER, AASIMAR_RADIANT_CONSUMPTION_IDENTIFIER, AASIMAR_RADIANT_SOUL_IDENTIFIER].includes(identifier)) {
+    return true;
+  }
+
+  const actor = workflow?.actor ?? item.actor;
+  if (!actor) return true;
+  const existing = aasimarRevelationMarker(actor);
+  if (existing) await actor.deleteEmbeddedDocuments("ActiveEffect", [existing.id]);
+
+  const effectData = effectDataFromItem(item, effect => effect.getFlag?.(MODULE_ID, AASIMAR_REVELATION_FLAG), actor);
+  if (!effectData) return true;
+  effectData.flags ??= {};
+  effectData.flags[MODULE_ID] = {
+    ...(effectData.flags[MODULE_ID] ?? {}),
+    sourceActorUuid: actor.uuid,
+  };
+  await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+  return true;
+}
+
+async function applyDeclaredAasimarRevelationDamage(item, usageConfig, workflow) {
+  const rider = declaredRider(usageConfig, workflow, AASIMAR_REVELATION_DAMAGE_IDENTIFIER);
+  if (!rider) return true;
+
+  const actor = workflow?.actor ?? item?.actor;
+  const marker = aasimarRevelationMarker(actor);
+  if (!actor || !marker) {
+    await ChatMessage.create({
+      user: game.user?.id,
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: "<p><strong>Aasimar Revelation:</strong> skipped; no active revelation.</p>",
+    });
+    return true;
+  }
+
+  const requestedDamageType = String(rider.damageType ?? aasimarRevelationDamageType(marker) ?? "").toLowerCase();
+  const allowedDamageType = String(aasimarRevelationDamageType(marker) ?? "").toLowerCase();
+  if (!requestedDamageType || requestedDamageType !== allowedDamageType) {
+    await ChatMessage.create({
+      user: game.user?.id,
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: "<p><strong>Aasimar Revelation:</strong> skipped; declared damage type does not match the active revelation.</p>",
+    });
+    return true;
+  }
+
+  const prof = Number(actor.system?.attributes?.prof ?? 0);
+  if (!Number.isFinite(prof) || prof <= 0) return true;
+  await applyBonusDamageWorkflow(workflow, String(prof), requestedDamageType, `Aasimar Revelation (+${prof} ${requestedDamageType})`);
+  return true;
+}
+
+function tokenHasAasimarRevelation(token, identifier) {
+  return Array.from(token?.actor?.effects ?? []).some(effect => {
+    if (!effect.getFlag?.(MODULE_ID, AASIMAR_REVELATION_FLAG)) return false;
+    const sourceActorUuid = effect.getFlag(MODULE_ID, "sourceActorUuid");
+    const baseActorUuid = game.actors?.get(token.document?.actorId)?.uuid;
+    if (!sourceActorUuid || ![token.actor?.uuid, baseActorUuid].includes(sourceActorUuid)) return false;
+    return !identifier || effect.getFlag(MODULE_ID, "identifier") === identifier;
+  });
+}
+
+async function applyRadiantConsumptionTurnEnd(sourceToken) {
+  if (!sourceToken?.actor || !tokenHasAasimarRevelation(sourceToken, AASIMAR_RADIANT_CONSUMPTION_IDENTIFIER)) return;
+  const prof = Number(sourceToken.actor.system?.attributes?.prof ?? 0);
+  if (!Number.isFinite(prof) || prof <= 0) return;
+  const targets = Array.from(canvas.tokens?.placeables ?? []).filter(token =>
+    token?.actor && distanceBetweenTokens(sourceToken, token) <= 10
+  );
+  if (!targets.length) return;
+  await applyBonusDamageWorkflow({
+    actor: sourceToken.actor,
+    token: sourceToken,
+    hitTargets: new Set(targets),
+    itemCardId: null,
+  }, String(prof), "radiant", `Radiant Consumption (+${prof} radiant)`);
+}
+
+async function applyDuelingDamageBonus(workflow) {
+  if (workflow?.flags?.[MODULE_ID]?.duelingApplied || workflow?.__arcaneDuelingApplied) return true;
+  if (!isDuelingEligible(workflow)) return true;
+  workflow.__arcaneDuelingApplied = true;
+  workflow.flags ??= {};
+  workflow.flags[MODULE_ID] = {
+    ...(workflow.flags[MODULE_ID] ?? {}),
+    duelingApplied: true,
+  };
+  await applyBonusDamageWorkflow(workflow, "2", workflowDamageType(workflow), "Dueling Fighting Style (+2)");
+  return true;
+}
+
 function effectSourceMatchesActor(effect, actor, token) {
   const sourceActorUuid =
-    readSharedAutomationFlag(effect, "sourceActorUuid")
+    effect?.getFlag?.(MODULE_ID, "sourceActorUuid")
     ?? effect?.flags?.[MODULE_ID]?.sourceActorUuid
     ?? sourceActorUuidFromOrigin(effect?.origin);
   const baseActorUuid = token?.document?.actorId ? game.actors?.get(token.document.actorId)?.uuid : null;
@@ -15866,7 +17427,7 @@ async function executeCompilerEventNeighborhoodActivity({
       "Compiler event-neighborhood activity is missing its activity or anchor",
     );
   }
-  const contract = readSharedAutomationFlag(activity, "triggeredEventActivity")
+  const contract = activity.getFlag?.(MODULE_ID, "triggeredEventActivity")
     ?? activity.flags?.[MODULE_ID]?.triggeredEventActivity;
   const radius = Number(contract?.radius);
   const hasNeighborhood = contract?.radius !== undefined;
@@ -15992,7 +17553,10 @@ async function applyCompilerRuntimeTriggeredActivityFromUse(
   workflow,
 ) {
   const parentActivity = workflow?.activity;
-  const link = readSharedAutomationFlag(parentActivity, "runtimeTriggeredActivity") ?? parentActivity?.flags?.[MODULE_ID]?.runtimeTriggeredActivity;
+  const link = parentActivity?.getFlag?.(
+    MODULE_ID,
+    "runtimeTriggeredActivity",
+  ) ?? parentActivity?.flags?.[MODULE_ID]?.runtimeTriggeredActivity;
   if (Number(link?.version) !== 1) return true;
   const anchorTargets = workflowTargetTokens(workflow);
   if (anchorTargets.length !== 1) {
@@ -16271,7 +17835,7 @@ async function finalizeDeclaredActiveBuff(workflow) {
 
 function hunterMarkEffectForTarget(target, sourceActor, sourceToken) {
   return Array.from(target?.actor?.effects ?? []).find(effect => {
-    const identifier = readSharedAutomationFlag(effect, "identifier") ?? effect.flags?.[MODULE_ID]?.identifier;
+    const identifier = effect.getFlag?.(MODULE_ID, "identifier") ?? effect.flags?.[MODULE_ID]?.identifier;
     const isHunterMark =
       identifier === "hunters-mark" ||
       /hunter'?s mark|猎人印记/i.test(String(effect.name ?? ""));
@@ -16286,7 +17850,7 @@ async function applyHuntersMarkDamageBonus(workflow) {
   const actor = workflow?.actor;
   const hunterMarkItem = Array.from(actor?.items ?? []).find(item => item.system?.identifier === "hunters-mark");
   if (hunterMarkItem?.flags?.[MODULE_ID]?.compiler?.version) return true;
-  if (readSharedAutomationFlag(hunterMarkItem, "huntersMarkMarkerOnly") === true
+  if (hunterMarkItem?.getFlag?.(MODULE_ID, "huntersMarkMarkerOnly") === true
     || hunterMarkItem?.flags?.[MODULE_ID]?.huntersMarkMarkerOnly === true) {
     return true;
   }
@@ -16308,6 +17872,132 @@ async function applyHuntersMarkDamageBonus(workflow) {
     targets: markedTargets,
     isCritical: isCriticalHitWorkflow(workflow),
   });
+  return true;
+}
+
+function weaponBaseDamageFaces(workflow) {
+  const activityPart = Object.values(workflow?.activity?.damage?.parts ?? {})[0];
+  const itemPart = Array.isArray(workflow?.item?.system?.damage?.parts) ? workflow.item.system.damage.parts[0] : null;
+  const faces = Number(activityPart?.denomination ?? itemPart?.[0]?.match?.(/d(\d+)/i)?.[1]);
+  return Number.isFinite(faces) && faces > 0 ? new Set([faces]) : null;
+}
+
+async function applyGreatWeaponFightingReroll(workflow) {
+  if (workflow?.flags?.[MODULE_ID]?.greatWeaponFightingApplied || workflow?.__arcaneGreatWeaponFightingApplied) return true;
+  if (!isGreatWeaponFightingEligible(workflow)) return true;
+  const allowedFaces = weaponBaseDamageFaces(workflow);
+  if (!allowedFaces) return true;
+
+  const changes = [];
+  for (const roll of workflowDamageRolls(workflow)) {
+    if (isArcaneExtraDamageRoll(roll)) continue;
+    for (const term of roll.terms ?? []) {
+      const faces = Number(term.faces);
+      if (!allowedFaces.has(faces) || !Array.isArray(term.results)) continue;
+      for (const result of term.results) {
+        if (result.active === false || result.discarded || result.rerolled) continue;
+        const original = Number(result.result);
+        if (![1, 2].includes(original)) continue;
+        const replacementRoll = await new Roll("1d" + faces).evaluate();
+        const replacement = Number(replacementRoll.total);
+        result.result = replacement;
+        changes.push({ original, replacement, faces });
+      }
+    }
+    if (changes.length && typeof roll._evaluateTotal === "function") roll._total = roll._evaluateTotal();
+  }
+
+  if (!changes.length) return true;
+  workflow.__arcaneGreatWeaponFightingApplied = true;
+  workflow.flags ??= {};
+  workflow.flags[MODULE_ID] = {
+    ...(workflow.flags[MODULE_ID] ?? {}),
+    greatWeaponFightingApplied: true,
+    greatWeaponFightingRerolls: changes,
+  };
+  if (typeof workflow.setDamageRolls === "function") await workflow.setDamageRolls(workflow.damageRolls);
+  const totalDelta = changes.reduce((sum, change) => sum + change.replacement - change.original, 0);
+  await ChatMessage.create({
+    user: game.user?.id,
+    speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
+    content: "<p><strong>Great Weapon Fighting:</strong> rerolled "
+      + changes.map(change => "d" + change.faces + " " + change.original + " -> " + change.replacement).join(", ")
+      + " (" + (totalDelta >= 0 ? "+" : "") + totalDelta + ")</p>",
+  });
+  return true;
+}
+
+async function applySavageAttackerHouseRuleReroll(workflow) {
+  if (workflow?.flags?.[MODULE_ID]?.savageAttackerApplied || workflow?.__arcaneSavageAttackerApplied) return true;
+  if (!actorHasFeature(workflow?.actor, SAVAGE_ATTACKER_IDENTIFIER)) return true;
+  if (!isWeaponWorkflow(workflow)) return true;
+
+  const kept = [];
+  const improved = [];
+  for (const roll of workflowDamageRolls(workflow)) {
+    if (isArcaneExtraDamageRoll(roll)) continue;
+    const candidates = [];
+    for (const term of roll.terms ?? []) {
+      const faces = Number(term.faces);
+      if (!Number.isFinite(faces) || faces <= 0 || !Array.isArray(term.results)) continue;
+      for (const result of term.results) {
+        if (result.active === false || result.discarded || result.rerolled) continue;
+        const original = Number(result.result);
+        if (!Number.isFinite(original)) continue;
+        const replacementRoll = await new Roll("1d" + faces).evaluate();
+        const replacement = Number(replacementRoll.total);
+        if (!Number.isFinite(replacement)) continue;
+        candidates.push({ result, original, replacement, faces });
+      }
+    }
+    if (!candidates.length) continue;
+
+    const originalDiceTotal = candidates.reduce((sum, change) => sum + change.original, 0);
+    const replacementDiceTotal = candidates.reduce((sum, change) => sum + change.replacement, 0);
+    if (replacementDiceTotal > originalDiceTotal) {
+      for (const change of candidates) change.result.result = change.replacement;
+      if (typeof roll._evaluateTotal === "function") roll._total = roll._evaluateTotal();
+      improved.push({ originalDiceTotal, replacementDiceTotal, dice: candidates.map(change => ({ original: change.original, replacement: change.replacement, faces: change.faces })) });
+    } else {
+      kept.push({ originalDiceTotal, replacementDiceTotal });
+    }
+  }
+
+  if (!improved.length && !kept.length) return true;
+  workflow.__arcaneSavageAttackerApplied = true;
+  workflow.flags ??= {};
+  workflow.flags[MODULE_ID] = {
+    ...(workflow.flags[MODULE_ID] ?? {}),
+    savageAttackerApplied: true,
+    savageAttackerRerolls: { improved, kept },
+  };
+  if (improved.length && typeof workflow.setDamageRolls === "function") await workflow.setDamageRolls(workflow.damageRolls);
+
+  const detail = improved.length
+    ? "kept reroll (" + improved.map(entry => entry.originalDiceTotal + " -> " + entry.replacementDiceTotal).join(", ") + ")"
+    : "kept original; reroll was not higher";
+  await ChatMessage.create({
+    user: game.user?.id,
+    speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
+    content: "<p><strong>Savage Attacker:</strong> " + detail + ".</p>",
+  });
+  return true;
+}
+
+async function applySavageAttacksDamageBonus(workflow) {
+  if (workflow?.flags?.[MODULE_ID]?.savageAttacksApplied || workflow?.__arcaneSavageAttacksApplied) return true;
+  if (!actorHasFeature(workflow?.actor, SAVAGE_ATTACKS_IDENTIFIER)) return true;
+  if (!isMeleeWeaponWorkflow(workflow) || !isCriticalHitWorkflow(workflow)) return true;
+  const allowedFaces = weaponBaseDamageFaces(workflow);
+  const faces = allowedFaces ? Math.max(...allowedFaces) : 0;
+  if (!Number.isFinite(faces) || faces <= 0) return true;
+  workflow.__arcaneSavageAttacksApplied = true;
+  workflow.flags ??= {};
+  workflow.flags[MODULE_ID] = {
+    ...(workflow.flags[MODULE_ID] ?? {}),
+    savageAttacksApplied: true,
+  };
+  await applyBonusDamageWorkflow(workflow, `1d${faces}`, workflowDamageType(workflow), `Savage Attacks (+1d${faces})`);
   return true;
 }
 
@@ -16637,7 +18327,7 @@ async function enforceCompilerWeaponDamageMinimum(workflow) {
 
 function fatalDamageInterceptionContract(document) {
   const value =
-    readSharedAutomationFlag(document, FATAL_DAMAGE_INTERCEPTION_FLAG)
+    document?.getFlag?.(MODULE_ID, FATAL_DAMAGE_INTERCEPTION_FLAG)
     ?? document?.flags?.[MODULE_ID]?.[FATAL_DAMAGE_INTERCEPTION_FLAG];
   if (
     value == null
@@ -16700,19 +18390,31 @@ function isExactDeathWardInterceptionEffect(effect, actor, contract, artifactId 
   );
 }
 
+function isExactRelentlessEnduranceInterceptionItem(item, actor, contract) {
+  return Boolean(
+    item?.documentName === "Item"
+    && (item.actor ?? item.parent)?.uuid === actor?.uuid
+    && item.system?.identifier === "relentless-endurance"
+    && contract?.kind === "relentless-endurance"
+    && contract.rank === 200
+    && contract.minimumHitPoints === 1
+    && !contract.artifactId
+  );
+}
+
 function fatalDamageInterceptionPendingReceipts(actor) {
   const value =
-    readSharedAutomationFlag(actor, FATAL_DAMAGE_INTERCEPTION_PENDING_FLAG)
+    actor?.getFlag?.(MODULE_ID, FATAL_DAMAGE_INTERCEPTION_PENDING_FLAG)
     ?? actor?.flags?.[MODULE_ID]?.[FATAL_DAMAGE_INTERCEPTION_PENDING_FLAG];
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-  return (Object.entries(value)
+  return Object.entries(value)
     .filter(([receiptId, receipt]) =>
       Boolean(receiptId)
       && receipt
       && typeof receipt === "object"
       && !Array.isArray(receipt)
     )
-    .map(([receiptId, receipt]) => ({ ...receipt, receiptId }))).filter(receipt => receipt.candidateKind === "death-ward");
+    .map(([receiptId, receipt]) => ({ ...receipt, receiptId }));
 }
 
 function isValidFatalDamageInterceptionReceipt(actor, receipt) {
@@ -16944,7 +18646,40 @@ function collectFatalDamageInterceptionCandidates(actor) {
     });
   }
 
-  ;
+  for (const item of Array.from(actor.items ?? [])) {
+    const contract = fatalDamageInterceptionContract(item);
+    const sourceDocumentUuid = String(item?.uuid ?? "");
+    const sourceKey = fatalDamageInterceptionSourceReservationKey(
+      actor.uuid,
+      sourceDocumentUuid,
+    );
+    const max = Number(item.system?.uses?.max ?? 0);
+    const spent = Number(item.system?.uses?.spent ?? 0);
+    if (
+      !isExactRelentlessEnduranceInterceptionItem(item, actor, contract)
+      || !sourceDocumentUuid
+      || pendingSources.has(sourceDocumentUuid)
+      || FATAL_DAMAGE_INTERCEPTION_SOURCE_RESERVATIONS.has(sourceKey)
+      || !Number.isFinite(max)
+      || max <= 0
+      || !Number.isFinite(spent)
+      || spent < 0
+      || spent >= max
+    ) continue;
+    candidates.push({
+      candidateKind: contract.kind,
+      rank: contract.rank,
+      minimumHitPoints: contract.minimumHitPoints,
+      sourceDocumentUuid,
+      sourceActorUuid: actor.uuid,
+      sourceItemUuid: sourceDocumentUuid,
+      sourceEffectUuid: null,
+      artifactId: null,
+      usesSpentBefore: spent,
+      usesSpentAfter: spent + 1,
+      createdAt: Number(item?._stats?.createdTime ?? 0) || 0,
+    });
+  }
 
   return candidates.sort((left, right) =>
     left.rank - right.rank
@@ -17104,7 +18839,7 @@ async function consumeFatalDamageInterceptionSource(actor, receipt) {
   }
   if (receipt.candidateKind === "relentless-endurance") {
     if (
-      !false
+      !isExactRelentlessEnduranceInterceptionItem(source, actor, contract)
       || source.uuid !== receipt.sourceItemUuid
     ) {
       throw new Error(
@@ -17123,7 +18858,7 @@ async function consumeFatalDamageInterceptionSource(actor, receipt) {
       throw new Error("Relentless Endurance pending receipt has invalid use accounting");
     }
     const lastReceiptId = String(
-      readSharedAutomationFlag(source, "fatalDamageInterceptionLastReceiptId")
+      source.getFlag?.(MODULE_ID, "fatalDamageInterceptionLastReceiptId")
       ?? source.flags?.[MODULE_ID]?.fatalDamageInterceptionLastReceiptId
       ?? "",
     );
@@ -17142,7 +18877,7 @@ async function consumeFatalDamageInterceptionSource(actor, receipt) {
     if (
       Number(source.system?.uses?.spent ?? 0) < spentAfter
       || String(
-        readSharedAutomationFlag(source, "fatalDamageInterceptionLastReceiptId")
+        source.getFlag?.(MODULE_ID, "fatalDamageInterceptionLastReceiptId")
         ?? source.flags?.[MODULE_ID]?.fatalDamageInterceptionLastReceiptId
         ?? "",
       ) !== receipt.receiptId
@@ -17302,6 +19037,10 @@ async function recoverFatalDamageInterceptions() {
   return true;
 }
 
+function isUndeadOrFiendActor(actor) {
+  return /(^|[^A-Za-z0-9_])(undead|fiend|不死|邪魔)([^A-Za-z0-9_]|$)/i.test(actorRaceOrType(actor));
+}
+
 function spellSlotPath(level) {
   const slotLevel = Math.max(1, Math.min(9, Number(level) || 1));
   return `system.spells.spell${slotLevel}.value`;
@@ -17314,12 +19053,32 @@ function availableSpellSlotValue(actor, level) {
   return Number.isFinite(value) ? value : 0;
 }
 
+function resolveDivineSmiteSlot(actor, requestedLevel) {
+  const parsedRequestedLevel = Number(requestedLevel);
+  if (Number.isFinite(parsedRequestedLevel) && parsedRequestedLevel > 0) {
+    const slotLevel = Math.max(1, Math.min(9, parsedRequestedLevel));
+    return availableSpellSlotValue(actor, slotLevel) > 0 ? slotLevel : null;
+  }
+
+  for (let slotLevel = 1; slotLevel <= 9; slotLevel += 1) {
+    if (availableSpellSlotValue(actor, slotLevel) > 0) return slotLevel;
+  }
+
+  return null;
+}
+
 async function consumeSpellSlot(actor, level) {
   const slotLevel = Math.max(1, Math.min(9, Number(level) || 1));
   const value = availableSpellSlotValue(actor, slotLevel);
   if (!actor || value <= 0) return false;
   await actor.update({ [spellSlotPath(slotLevel)]: value - 1 });
   return true;
+}
+
+function divineSmiteDice(slotLevel, hitTargets) {
+  const baseDice = Math.min(5, Math.max(1, Number(slotLevel) || 1) + 1);
+  const bonusDice = hitTargets.some(target => isUndeadOrFiendActor(target.actor)) ? 1 : 0;
+  return baseDice + bonusDice;
 }
 
 function isCriticalHitWorkflow(workflow) {
@@ -17335,6 +19094,204 @@ function isCriticalHitWorkflow(workflow) {
     workflow?.attackRoll?.options?.critical,
     workflow?.d20AttackRoll?.options?.critical,
   ].some(value => value === true);
+}
+
+async function createDivineSmiteResultMessage(actor, status, detail) {
+  await ChatMessage.create({
+    user: game.user?.id,
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `<p><strong>Divine Smite:</strong> ${status}</p><p>${detail}</p>`,
+  });
+}
+
+async function createDreadAmbusherResultMessage(actor, status, detail) {
+  await ChatMessage.create({
+    user: game.user?.id,
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `<p><strong>Dread Ambusher:</strong> ${status}</p><p>${detail}</p>`,
+  });
+}
+
+async function applyDivineSmiteDamageWorkflow(workflow, hitTargets, dice, slotLevel, isCritical) {
+  await applyExtraDamageSegment(workflow, {
+    riderId: DIVINE_SMITE_IDENTIFIER,
+    formula: `${dice}d8`,
+    damageType: "radiant",
+    flavor: `Divine Smite - Level ${slotLevel} Spell Slot${isCritical ? " Critical" : ""} (Radiant)`,
+    targets: hitTargets,
+    isCritical,
+    resource: { type: "spellSlot", level: slotLevel },
+  });
+}
+
+async function applyDeclaredDivineSmite(item, usageConfig, workflow) {
+  const rider = declaredDivineSmiteRider(usageConfig, workflow);
+  if (!rider) return true;
+
+  const actor = workflow?.actor ?? item?.actor;
+  const smiteFeature = actor?.items?.find(candidate => candidate.system?.identifier === DIVINE_SMITE_IDENTIFIER);
+  if (!actor || !smiteFeature) return true;
+
+  if (!isMeleeWeaponWorkflow(workflow)) {
+    await createDivineSmiteResultMessage(actor, "skipped", "The triggering workflow was not a melee weapon attack.");
+    return true;
+  }
+
+  const hitTargets = workflowHitTargets(workflow);
+  if (hitTargets.length === 0) {
+    await createDivineSmiteResultMessage(actor, "skipped", "The attack did not hit, so no spell slot was consumed.");
+    return true;
+  }
+
+  const requestedLevel = rider.spellLevel ?? rider.level;
+  const slotLevel = resolveDivineSmiteSlot(actor, requestedLevel);
+  if (!slotLevel) {
+    const requested = Number(requestedLevel);
+    const detail = Number.isFinite(requested) && requested > 0
+      ? `No available level ${Math.max(1, Math.min(9, requested))} spell slot.`
+      : "No available spell slot.";
+    await createDivineSmiteResultMessage(actor, "skipped", detail);
+    return true;
+  }
+
+  const slotBefore = availableSpellSlotValue(actor, slotLevel);
+  const consumed = await consumeSpellSlot(actor, slotLevel);
+  if (!consumed) {
+    await createDivineSmiteResultMessage(actor, "skipped", `No available level ${slotLevel} spell slot.`);
+    return true;
+  }
+
+  const isCritical = isCriticalHitWorkflow(workflow);
+  const dice = divineSmiteDice(slotLevel, hitTargets) * (isCritical ? 2 : 1);
+  await applyDivineSmiteDamageWorkflow(workflow, hitTargets, dice, slotLevel, isCritical);
+  workflow.flags ??= {};
+  workflow.flags[MODULE_ID] = {
+    ...(workflow.flags[MODULE_ID] ?? {}),
+    divineSmiteResource: { type: "spellSlot", level: slotLevel, before: slotBefore, after: availableSpellSlotValue(actor, slotLevel) },
+  };
+  return true;
+}
+
+function sneakAttackDamageFormula(actor, isCritical) {
+  const rollData = actor?.getRollData?.() ?? {};
+  const resolved = String(
+    Roll.replaceFormulaData(SNEAK_ATTACK_DAMAGE_FORMULA, rollData),
+  ).trim();
+  if (!resolved || resolved.includes("@")) {
+    throw new Error("Sneak Attack could not resolve the Rogue sneak-attack scale");
+  }
+  if (!isCritical) return resolved;
+
+  const doubled = resolved.replace(/(\d+)d(\d+)/gi, (_match, dice, faces) =>
+    String(Number(dice) * 2) + "d" + faces
+  );
+  if (doubled === resolved) {
+    throw new Error("Sneak Attack critical damage requires a dice scale formula");
+  }
+  return doubled;
+}
+
+async function applyDeclaredSneakAttack(item, usageConfig, workflow) {
+  if (!declaredSneakAttackRider(usageConfig, workflow)) return true;
+
+  const actor = workflow?.actor ?? item?.actor;
+  const sneakAttackFeature = actor?.items?.find(candidate =>
+    candidate.system?.identifier === SNEAK_ATTACK_IDENTIFIER
+  );
+  if (!actor || !sneakAttackFeature) return true;
+
+  // The DM's explicit declaration is the rules decision. Runtime deliberately
+  // does not re-check weapon properties, roll mode, adjacency, or turn usage.
+  // It only waits for the parent workflow's final hit result before damage.
+  const hitTargets = effectHostHitTargets(workflow);
+  if (hitTargets.length === 0) return true;
+
+  const isCritical = isCriticalHitWorkflow(workflow);
+  await applyExtraDamageSegment(workflow, {
+    riderId: SNEAK_ATTACK_IDENTIFIER,
+    formula: sneakAttackDamageFormula(actor, isCritical),
+    damageType: workflowDamageType(workflow),
+    flavor: "Sneak Attack" + (isCritical ? " Critical" : ""),
+    targets: hitTargets,
+    isCritical,
+    img: sneakAttackFeature.img,
+  });
+  return true;
+}
+
+function dreadAmbusherFeature(actor) {
+  return actor?.items?.find(candidate => candidate.system?.identifier === DREAD_AMBUSHER_IDENTIFIER);
+}
+
+function dreadAmbusherAvailable(feature) {
+  const max = Number(feature?.system?.uses?.max ?? 0);
+  const spent = Number(feature?.system?.uses?.spent ?? 0);
+  return !Number.isFinite(max) || max <= 0 || spent < max;
+}
+
+async function consumeDreadAmbusherUse(feature) {
+  const max = Number(feature?.system?.uses?.max ?? 0);
+  const spent = Number(feature?.system?.uses?.spent ?? 0);
+  if (Number.isFinite(max) && max > 0 && spent >= max) return false;
+  if (Number.isFinite(max) && max > 0) {
+    await feature.update({ "system.uses.spent": Math.min(max, spent + 1) });
+  }
+  return true;
+}
+
+function isCombatRoundOneForActor(actor) {
+  const combat = game.combat;
+  if (!combat || Number(combat.round ?? 0) !== 1) return false;
+  const combatantActor = combat.combatant?.actor;
+  if (!combatantActor) return true;
+  return combatantActor.uuid === actor?.uuid || combatantActor.id === actor?.id;
+}
+
+async function applyDeclaredDreadAmbusher(item, usageConfig, workflow) {
+  const rider = declaredDreadAmbusherRider(usageConfig, workflow);
+  if (!rider) return true;
+
+  const actor = workflow?.actor ?? item?.actor;
+  const feature = dreadAmbusherFeature(actor);
+  if (!actor || !feature) return true;
+
+  if (!isWeaponWorkflow(workflow)) {
+    await createDreadAmbusherResultMessage(actor, "skipped", "The triggering workflow was not a weapon attack.");
+    return true;
+  }
+  if (!isCombatRoundOneForActor(actor)) {
+    await createDreadAmbusherResultMessage(actor, "skipped", "Dread Ambusher extra damage is only available on the actor's first combat turn.");
+    return true;
+  }
+
+  const hitTargets = workflowHitTargets(workflow);
+  if (!hitTargets.length) {
+    await createDreadAmbusherResultMessage(actor, "skipped", "The attack did not hit, so Dread Ambusher was not spent.");
+    return true;
+  }
+  if (!dreadAmbusherAvailable(feature)) {
+    await createDreadAmbusherResultMessage(actor, "skipped", "Dread Ambusher has already been used.");
+    return true;
+  }
+
+  const spentBefore = Number(feature.system?.uses?.spent ?? 0);
+  const consumed = await consumeDreadAmbusherUse(feature);
+  if (!consumed) {
+    await createDreadAmbusherResultMessage(actor, "skipped", "Dread Ambusher has already been used.");
+    return true;
+  }
+
+  const isCritical = isCriticalHitWorkflow(workflow);
+  await applyExtraDamageSegment(workflow, {
+    riderId: DREAD_AMBUSHER_IDENTIFIER,
+    formula: isCritical ? "2d8" : "1d8",
+    damageType: workflowDamageType(workflow),
+    flavor: `Dread Ambusher${isCritical ? " Critical" : ""}`,
+    targets: hitTargets,
+    isCritical,
+    resource: { type: "itemUses", itemUuid: feature.uuid, before: spentBefore, after: Number(feature.system?.uses?.spent ?? spentBefore + 1) },
+  });
+  return true;
 }
 
 async function createWeaponSpellRiderMessage(actor, name, status, detail) {
@@ -17763,9 +19720,509 @@ async function applyDeclaredWeaponSpellRider(item, usageConfig, workflow) {
   return true;
 }
 
+const RANGER_TCE_PATCH_IDENTIFIER = "ranger-tce-optional-features-patch";
+const RANGER_TCE_PATCH_VERSION = 1;
+const CHARACTER_PATCH_PACK_ID = MODULE_ID + ".characterpatches";
+const CLASS_FEATURE_PACK_ID = MODULE_ID + ".classfeatures";
+const RANGER_TCE_FEATURES_BY_LEVEL = [
+  { level: 1, packId: CLASS_FEATURE_PACK_ID, id: "X9xPihIslNck5bCk", identifier: "favored-foe" },
+  { level: 1, packId: CLASS_FEATURE_PACK_ID, id: "KyGD0UqLk90Er2cd", identifier: "deft-explorer" },
+  { level: 1, packId: CLASS_FEATURE_PACK_ID, id: "dyR8ImgN3MyQCMJ1", identifier: "canny" },
+  { level: 2, packId: CLASS_FEATURE_PACK_ID, id: "W8IgV3zZSWduIjd0", identifier: "additional-ranger-spells" },
+  { level: 3, packId: CLASS_FEATURE_PACK_ID, id: "1ViKFKTqfFSHAiM5", identifier: "primal-awareness" },
+  { level: 3, packId: CHARACTER_PATCH_PACK_ID, id: "arcPrimalSpeak01", identifier: "speak-with-animals-primal-awareness" },
+  { level: 5, packId: CHARACTER_PATCH_PACK_ID, id: "arcPrimalBeast01", identifier: "beast-sense-primal-awareness" },
+  { level: 6, packId: CLASS_FEATURE_PACK_ID, id: "WYSbzjOzh5IVQYR1", identifier: "roving" },
+];
+const RANGER_PHB_REPLACED_FEATURE_IDS = new Set(["4Vpj9vCOB37GtXk6", "8fbZt2Qh7ZttwIan"]);
+const RANGER_PHB_REPLACED_IDENTIFIERS = new Set(["favored-enemy", "natural-explorer"]);
+
+function itemIdentifier(item) {
+  return item?.system?.identifier || item?.flags?.[MODULE_ID]?.sourceIdentifier || "";
+}
+
+function isRangerTcePatchItem(item) {
+  return item?.type === "feat"
+    && (itemIdentifier(item) === RANGER_TCE_PATCH_IDENTIFIER || item?.flags?.[MODULE_ID]?.rangerTcePatch === true);
+}
+
+async function compendiumItemDocument(packId, id, identifier) {
+  const pack = game.packs.get(packId);
+  if (!pack) return null;
+  if (id) {
+    const direct = await pack.getDocument(id).catch(() => null);
+    if (direct) return direct;
+  }
+  const docs = await pack.getDocuments();
+  return docs.find(doc => itemIdentifier(doc) === identifier) ?? null;
+}
+
+function rangerTceEmbeddedSourceDocument(patchItem, spec) {
+  const sources = patchItem?.flags?.[MODULE_ID]?.rangerTcePatchSources;
+  const data = sources?.[spec.id] ?? sources?.[spec.identifier];
+  return data ? deepClone(data) : null;
+}
+
+function actorHasItemIdentifier(actor, identifier) {
+  return actor?.items?.some(item => itemIdentifier(item) === identifier);
+}
+
+async function createActorItemFromCompendium(actor, sourceDoc, spec) {
+  const data = typeof sourceDoc.toObject === "function" ? sourceDoc.toObject() : deepClone(sourceDoc);
+  delete data._id;
+  data.flags ??= {};
+  data.flags[MODULE_ID] = {
+    ...(data.flags[MODULE_ID] ?? {}),
+    rangerTcePatchAdded: true,
+    sourceCompendiumId: spec.id,
+    sourceIdentifier: spec.identifier,
+  };
+  await actor.createEmbeddedDocuments("Item", [data], { keepId: false });
+}
+
+async function removeRangerPhbReplacedFeatures(actor) {
+  const removable = actor.items
+    .filter(item => item.type === "feat")
+    .filter(item => RANGER_PHB_REPLACED_FEATURE_IDS.has(item.flags?.[MODULE_ID]?.sourceCompendiumId)
+      || RANGER_PHB_REPLACED_FEATURE_IDS.has(item._id)
+      || RANGER_PHB_REPLACED_IDENTIFIERS.has(itemIdentifier(item)))
+    .map(item => item.id);
+  if (removable.length) await actor.deleteEmbeddedDocuments("Item", removable);
+  return removable.length;
+}
+
+async function deletePatchItem(item) {
+  if (!item?.parent) return;
+  await item.parent.deleteEmbeddedDocuments("Item", [item.id]).catch(() => {});
+}
+
+async function applyRangerTceOptionalFeaturesPatch(actor, patchItem) {
+  const rangerLevel = classLevels(actor, "ranger");
+  if (!rangerLevel) {
+    ui.notifications?.warn("Ranger TCE patch skipped: this actor has no Ranger class levels.");
+    await deletePatchItem(patchItem);
+    return { skipped: true, reason: "not-ranger" };
+  }
+
+  const specs = RANGER_TCE_FEATURES_BY_LEVEL.filter(spec => rangerLevel >= spec.level);
+  const sourceDocs = [];
+  for (const spec of specs) {
+    if (actorHasItemIdentifier(actor, spec.identifier)) continue;
+    const doc = rangerTceEmbeddedSourceDocument(patchItem, spec)
+      ?? await compendiumItemDocument(spec.packId, spec.id, spec.identifier);
+    if (!doc) {
+      ui.notifications?.warn("Ranger TCE patch skipped: missing source item " + spec.identifier + ".");
+      await deletePatchItem(patchItem);
+      return { skipped: true, reason: "missing-source", spec };
+    }
+    sourceDocs.push({ spec, doc });
+  }
+
+  const removed = await removeRangerPhbReplacedFeatures(actor);
+  const added = [];
+  for (const entry of sourceDocs) {
+    if (actorHasItemIdentifier(actor, entry.spec.identifier)) continue;
+    await createActorItemFromCompendium(actor, entry.doc, entry.spec);
+    added.push(entry.spec.identifier);
+  }
+
+  await actor.setFlag(MODULE_ID, "rangerTcePatch", {
+    version: RANGER_TCE_PATCH_VERSION,
+    appliedAt: Date.now(),
+    rangerLevel,
+    removed,
+    added,
+  });
+  await deletePatchItem(patchItem);
+  ui.notifications?.info("Ranger TCE patch applied: level " + rangerLevel + ", added " + added.length + ", removed " + removed + ".");
+  return { rangerLevel, removed, added };
+}
+
+async function handleRangerTcePatchCreate(item, options, userId) {
+  if (!isRangerTcePatchItem(item)) return;
+  if (!item.parent || item.parent.documentName !== "Actor") return;
+  if (userId && game.user?.id !== userId && !game.user?.isGM) return;
+  await applyRangerTceOptionalFeaturesPatch(item.parent, item);
+}
+
+function favoredFoeDamageFormula(actor) {
+  const level = classLevels(actor, "ranger");
+  if (level >= 14) return "1d8";
+  if (level >= 6) return "1d6";
+  return "1d4";
+}
+
+function favoredFoeSourceEffects(actor) {
+  return Array.from(actor?.effects ?? []).filter(effect => effect.flags?.[MODULE_ID]?.favoredFoeSource === true);
+}
+
+function favoredFoeTargetEffects(actor, sourceActorUuid) {
+  return Array.from(actor?.effects ?? []).filter(effect =>
+    effect.flags?.[MODULE_ID]?.favoredFoeTarget === true
+    && effect.flags?.[MODULE_ID]?.sourceActorUuid === sourceActorUuid
+  );
+}
+
+function targetTokensFromInput(targets) {
+  if (targets instanceof Set) return Array.from(targets);
+  if (Array.isArray(targets)) return targets;
+  if (targets?.actor) return [targets];
+  return Array.from(game.user?.targets ?? []);
+}
+
+async function createFavoredFoeSourceEffect(actor, item) {
+  const data = simpleSpellEffectData(item, actor, {
+    name: "Favored Foe Concentration",
+    durationSeconds: 60,
+    flags: {
+      [MODULE_ID]: {
+        favoredFoeSource: true,
+        sourceActorUuid: actor.uuid,
+      },
+      "midi-qol": {
+        isConcentration: true,
+      },
+    },
+  });
+  data.statuses = ["concentrating"];
+  await actor.createEmbeddedDocuments("ActiveEffect", [data]);
+}
+
+async function createFavoredFoeTargetEffect(actor, item, targets) {
+  const data = simpleSpellEffectData(item, actor, {
+    name: "Favored Foe",
+    durationSeconds: 60,
+    flags: {
+      [MODULE_ID]: {
+        favoredFoeTarget: true,
+        sourceActorUuid: actor.uuid,
+      },
+    },
+  });
+  await applyEffectDataToTokens(targets, data);
+}
+
+async function consumeFavoredFoeUse(item) {
+  const uses = item?.system?.uses;
+  const maxRaw = String(uses?.max ?? "");
+  const max = maxRaw === "@prof" ? Number(item.actor?.system?.attributes?.prof ?? 0) : Number(maxRaw || 0);
+  const spent = Number(uses?.spent ?? 0);
+  if (max && spent >= max) return false;
+  await item.update({ "system.uses.spent": spent + 1 });
+  return true;
+}
+
+async function applyFavoredFoe(actor, targets = null) {
+  const item = actor?.items?.find(candidate => itemIdentifier(candidate) === "favored-foe");
+  const tokens = targetTokensFromInput(targets).filter(token => token?.actor);
+  if (!actor || !item || !tokens.length) return { applied: false };
+  const hasSource = favoredFoeSourceEffects(actor).length > 0;
+  if (!hasSource) {
+    const consumed = await consumeFavoredFoeUse(item);
+    if (!consumed) {
+      ui.notifications?.warn("Favored Foe has no remaining uses.");
+      return { applied: false, reason: "no-uses" };
+    }
+    await createFavoredFoeSourceEffect(actor, item);
+    await createFavoredFoeTargetEffect(actor, item, tokens);
+  }
+  const formula = favoredFoeDamageFormula(actor);
+  const result = await rollDamageToTargets(tokens, formula);
+  await ChatMessage.create({
+    user: game.user?.id,
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: "<p><strong>Favored Foe:</strong> " + formula + " = " + result.damage + " damage.</p>",
+  });
+  return { applied: true, formula, damage: result.damage, consumed: !hasSource };
+}
+
+async function cleanupFavoredFoeTargets(effect) {
+  if (effect?.flags?.[MODULE_ID]?.favoredFoeSource !== true) return;
+  const sourceActorUuid = effect.flags?.[MODULE_ID]?.sourceActorUuid;
+  if (!sourceActorUuid) return;
+  for (const token of canvas?.tokens?.placeables ?? []) {
+    const actor = token?.actor;
+    const removable = favoredFoeTargetEffects(actor, sourceActorUuid).map(targetEffect => targetEffect.id);
+    if (removable.length) await actor.deleteEmbeddedDocuments("ActiveEffect", removable);
+  }
+}
+
+function isArcaneFeatItem(item) {
+  return item?.type === "feat"
+    && item.system?.identifier
+    && item.flags?.[MODULE_ID]?.sourcePack === "feats-all";
+}
+
+function preventDuplicateArcaneFeatCreate(item) {
+  if (!isArcaneFeatItem(item)) return true;
+  const actor = item.parent ?? item.actor;
+  if (!actor?.items) return true;
+  const identifier = item.system.identifier;
+  const duplicate = Array.from(actor.items).some(existing =>
+    existing?.id !== item.id
+    && isArcaneFeatItem(existing)
+    && existing.system?.identifier === identifier
+  );
+  if (!duplicate) return true;
+  ui.notifications?.warn("Arcane feat already exists on this actor: " + item.name);
+  return false;
+}
+
+function declaredPowerAttackUse(item, usageConfig) {
+  const rider = declaredRider(usageConfig, null, [GREAT_WEAPON_MASTER_IDENTIFIER, SHARPSHOOTER_IDENTIFIER]);
+  if (!rider) return null;
+  const actor = item?.actor;
+  const activity = usageConfig?.activity ?? usageConfig?.workflowOptions?.activity ?? null;
+  const identifier = rider.identifier ?? rider.id ?? "";
+  if (identifier === GREAT_WEAPON_MASTER_IDENTIFIER) {
+    if (!actorHasFeature(actor, GREAT_WEAPON_MASTER_IDENTIFIER)) return null;
+    if (!isMeleeWeaponAttack(item, activity)) return null;
+    if (!itemHasProperty(item, ["hvy", "heavy"])) return null;
+    return {
+      name: "Great Weapon Master",
+      attackBonusKey: "system.bonuses.mwak.attack",
+      damageBonusKey: "system.bonuses.mwak.damage",
+      identifier,
+    };
+  }
+  if (identifier === SHARPSHOOTER_IDENTIFIER) {
+    if (!actorHasFeature(actor, SHARPSHOOTER_IDENTIFIER)) return null;
+    if (!isRangedWeaponAttack(item, activity)) return null;
+    return {
+      name: "Sharpshooter",
+      attackBonusKey: "system.bonuses.rwak.attack",
+      damageBonusKey: "system.bonuses.rwak.damage",
+      identifier,
+    };
+  }
+  return null;
+}
+
+async function applyDeclaredPowerAttackBeforeUse(item, usageConfig) {
+  const actor = item?.actor;
+  const declaration = declaredPowerAttackUse(item, usageConfig);
+  if (!actor || !declaration) return null;
+  const [effect] = await actor.createEmbeddedDocuments("ActiveEffect", [{
+    name: declaration.name + " Declared",
+    img: item?.img,
+    origin: item?.uuid,
+    disabled: false,
+    transfer: false,
+    changes: [
+      { key: declaration.attackBonusKey, mode: 2, value: "-5", priority: 20 },
+      { key: declaration.damageBonusKey, mode: 2, value: "+10", priority: 20 },
+    ],
+    flags: {
+      [MODULE_ID]: {
+        declaredPowerAttack: true,
+        identifier: declaration.identifier,
+      },
+      dae: { specialDuration: ["1Attack", "1Hit", "turnEnd", "combatEnd"], stackable: "noneName", showIcon: false },
+    },
+    type: "base",
+    system: {},
+  }]);
+  return effect ?? null;
+}
+
+async function cleanupDeclaredPowerAttackEffect(effect) {
+  if (!effect) return;
+  const actor = effect.parent;
+  if (actor?.deleteEmbeddedDocuments && effect.id) {
+    await actor.deleteEmbeddedDocuments("ActiveEffect", [effect.id]).catch(() => null);
+    return;
+  }
+  if (typeof effect.delete === "function") await effect.delete().catch(() => null);
+}
+
+function interactionContractVersion(interaction) {
+  const version = Number(interaction?.version ?? 0);
+  return Number.isFinite(version) && version > 0 ? version : 0;
+}
+
+function activityById(item, activityId) {
+  return item?.system?.activities?.get?.(activityId)
+    ?? activityValues(item).find(activity => (activity.id ?? activity._id) === activityId)
+    ?? null;
+}
+
+let characterSpellInteractionMigrationPromise = null;
+
+function compilerSpellContentNeedsUpdate(item, sourceCompiler) {
+  if (!sourceCompiler?.version) return false;
+  const currentCompiler = item?.flags?.[MODULE_ID]?.compiler ?? {};
+  return [
+    "schemaVersion",
+    "version",
+    "definitionHash",
+    "graphHash",
+    "planHash",
+  ].some(key => currentCompiler[key] !== sourceCompiler[key]);
+}
+
+async function migrateCharacterSpellInteractionContracts() {
+  if (characterSpellInteractionMigrationPromise) return characterSpellInteractionMigrationPromise;
+  const migration = migrateCharacterSpellInteractionContractsOnce();
+  characterSpellInteractionMigrationPromise = migration;
+  try {
+    return await migration;
+  } finally {
+    if (characterSpellInteractionMigrationPromise === migration) {
+      characterSpellInteractionMigrationPromise = null;
+    }
+  }
+}
+
+async function migrateCharacterSpellInteractionContractsOnce() {
+  if (!game.user?.isGM) return { skipped: true, reason: "not-gm" };
+  const pack = game.packs.get(ARCANE_SPELL_PACK_ID);
+  if (!pack) return { skipped: true, reason: "missing-pack" };
+
+  const index = await pack.getIndex({
+    fields: [
+      "name",
+      "system.identifier",
+      "system.activities",
+      "flags." + MODULE_ID + ".spellContentVersion",
+      "flags." + MODULE_ID + ".compiler",
+    ],
+  });
+  const sourceByIdentifier = new Map();
+  for (const entry of index) {
+    const identifier = String(entry.system?.identifier ?? "").trim();
+    if (identifier) sourceByIdentifier.set(identifier, entry);
+  }
+
+  const result = {
+    actors: 0,
+    spells: 0,
+    contentUpdated: 0,
+    effectsRebuilt: 0,
+    updatedActivities: 0,
+    skippedActivityMismatches: 0,
+  };
+
+  for (const actor of game.actors.filter(candidate => candidate.type === "character")) {
+    let actorChanged = false;
+    for (const item of actor.items.filter(candidate => candidate.type === "spell")) {
+      const identifier = String(item.system?.identifier ?? "").trim();
+      const source = identifier ? sourceByIdentifier.get(identifier) : null;
+      if (!source) continue;
+
+      const compilerManaged = Boolean(source.flags?.[MODULE_ID]?.compiler?.version);
+      if (VERSIONED_SPELL_CONTENT_IDENTIFIERS.has(identifier) || compilerManaged) {
+        const currentVersion = Number(item.getFlag?.(MODULE_ID, "spellContentVersion") ?? 0);
+        const fallbackVersion = LEVEL3_SPELL_CONTENT_IDENTIFIERS.has(identifier)
+          ? LEVEL3_SPELL_CONTENT_VERSION
+          : LEVEL1_2_SPELL_CONTENT_VERSION;
+        const sourceVersion = Number(source.flags?.[MODULE_ID]?.spellContentVersion ?? fallbackVersion);
+        const sourceCompiler = source.flags?.[MODULE_ID]?.compiler;
+        if (
+          currentVersion < sourceVersion
+          || compilerSpellContentNeedsUpdate(item, sourceCompiler)
+        ) {
+          const sourceDocument = await pack.getDocument(source._id);
+          const sourceData = sourceDocument?.toObject();
+          if (!sourceData) continue;
+
+          const sourceActivities = sourceData.system?.activities ?? {};
+          const systemUpdate = cloneSettings(item._source?.system ?? item.toObject()?.system ?? {});
+          systemUpdate.activities = cloneSettings(sourceActivities);
+          systemUpdate.ability = cloneSettings(sourceData.system?.ability ?? "");
+          systemUpdate.properties = cloneSettings(sourceData.system?.properties ?? []);
+
+          const oldEffects = Array.from(item.effects ?? []);
+          if (oldEffects.length) {
+            await item.deleteEmbeddedDocuments("ActiveEffect", oldEffects.map(effect => effect.id));
+          }
+          const sourceEffects = (sourceData.effects ?? []).map(effect => {
+            const copy = cloneSettings(effect);
+            delete copy._stats;
+            return copy;
+          });
+          if (sourceEffects.length) {
+            await item.createEmbeddedDocuments("ActiveEffect", sourceEffects, { keepId: true });
+          }
+          await item.update({ system: systemUpdate }, { recursive: false });
+          const managedFlagNamespaces = ["midi-qol", "dae", "autoanimations", MODULE_ID];
+          const flagDeletes = {};
+          for (const namespace of managedFlagNamespaces) {
+            if (item.flags?.[namespace] !== undefined) {
+              flagDeletes["flags.-=" + namespace] = null;
+            }
+          }
+          if (Object.keys(flagDeletes).length) await item.update(flagDeletes);
+
+          const automationFlags = {};
+          for (const namespace of ["midi-qol", "dae", "autoanimations"]) {
+            const sourceFlags = sourceData.flags?.[namespace];
+            if (sourceFlags !== undefined) {
+              automationFlags["flags." + namespace] = cloneSettings(sourceFlags);
+            }
+          }
+          const sourceModuleFlags = cloneSettings(sourceData.flags?.[MODULE_ID] ?? {});
+          sourceModuleFlags.spellContentVersion = sourceVersion;
+          sourceModuleFlags.spellAutomation = cloneSettings(
+            sourceData.flags?.[MODULE_ID]?.spellAutomation ?? {},
+          );
+          automationFlags["flags." + MODULE_ID] = sourceModuleFlags;
+          await item.update(automationFlags);
+          result.spells += 1;
+          result.contentUpdated += 1;
+          result.effectsRebuilt += sourceEffects.length;
+          actorChanged = true;
+        }
+        continue;
+      }
+
+      const sourceActivities = activityValues(source).filter(activity =>
+        typeof activity.flags?.[MODULE_ID]?.interaction?.templateTargets === "string"
+      );
+      if (!sourceActivities.length) continue;
+      result.spells += 1;
+
+      for (const sourceActivity of sourceActivities) {
+        const activityId = sourceActivity.id ?? sourceActivity._id;
+        const activity = activityById(item, activityId);
+        if (!activity) {
+          result.skippedActivityMismatches += 1;
+          continue;
+        }
+
+        const sourceInteraction = sourceActivity.flags?.[MODULE_ID]?.interaction;
+        const currentInteraction = activity.flags?.[MODULE_ID]?.interaction;
+        if (interactionContractVersion(currentInteraction) >= interactionContractVersion(sourceInteraction)) continue;
+
+        const update = {
+          ["flags." + MODULE_ID + ".interaction"]: cloneSettings(sourceInteraction),
+        };
+        if (typeof sourceActivity.target?.prompt === "boolean") {
+          update["target.prompt"] = sourceActivity.target.prompt;
+        }
+        if (typeof sourceActivity.midiProperties?.autoTargetAction === "string") {
+          update["midiProperties.autoTargetAction"] = sourceActivity.midiProperties.autoTargetAction;
+        }
+        if (typeof sourceActivity.midiProperties?.autoTargetType === "string") {
+          update["midiProperties.autoTargetType"] = sourceActivity.midiProperties.autoTargetType;
+        }
+
+        await item.updateActivity(activityId, update);
+        result.updatedActivities += 1;
+        actorChanged = true;
+      }
+    }
+    if (actorChanged) result.actors += 1;
+  }
+
+  if (result.contentUpdated || result.updatedActivities || result.skippedActivityMismatches) {
+    console.info("[" + MODULE_ID + "] character spell interaction migration complete.", result);
+  }
+  return result;
+}
+
 function compilerIndependentProjectilesContract(item, workflow) {
   const activity = workflow?.activity;
-  const interaction = readSharedAutomationFlag(activity, "interaction")
+  const interaction = activity?.getFlag?.(MODULE_ID, "interaction")
     ?? activity?.flags?.[MODULE_ID]?.interaction
     ?? null;
   const resolution = interaction?.resolution;
@@ -17784,7 +20241,10 @@ function compilerIndependentProjectilesContract(item, workflow) {
 }
 
 function inheritCompilerTriggeredActivityScaling(activity, usageConfig) {
-  const contract = readSharedAutomationFlag(activity, "triggeredEventActivity") ?? activity?.flags?.[MODULE_ID]?.triggeredEventActivity;
+  const contract = activity?.getFlag?.(
+    MODULE_ID,
+    "triggeredEventActivity",
+  ) ?? activity?.flags?.[MODULE_ID]?.triggeredEventActivity;
   if (
     Number(contract?.version) !== 1
     || (
@@ -18246,15 +20706,15 @@ function patchMidiCompleteItemUse() {
 
   const originalCompleteItemUse = midi.completeItemUse.bind(midi);
   midi.completeItemUse = async function arcaneCompleteItemUse(item, usageConfig, dialogConfig, messageConfig) {
-    ;
-    ;
-    ;
+    prepareTurnUndeadTargetsForUse(item, usageConfig);
+    prepareTwilightSanctuaryTargetsForUse(item, usageConfig);
+    prepareAasimarNecroticShroudTargetsForUse(item, usageConfig);
     inheritCompilerFollowUpCastLevel(
       usageConfig?.activity ?? null,
       item,
       usageConfig,
     );
-    ;
+    const declaredPowerAttackEffect = await applyDeclaredPowerAttackBeforeUse(item, usageConfig);
     let workflow = null;
     try {
       workflow = await originalCompleteItemUse(item, usageConfig, dialogConfig, messageConfig);
@@ -18267,21 +20727,21 @@ function patchMidiCompleteItemUse() {
         return workflow;
       }
       try {
-        ;
+        await applyVowOfEnmityMarkerFromUse(item, usageConfig, workflow);
         await finalizeDeclaredActiveBuff(workflow);
         await finalizeSourceAttackProximityRiders(workflow);
         await applyHuntersMarkDamageBonus(workflow);
         await applySpiritShroudDamageBonus(workflow);
-        ;
-        ;
-        ;
+        await applyDeclaredDivineSmite(item, usageConfig, workflow);
+        await applyDeclaredSneakAttack(item, usageConfig, workflow);
+        await applyDeclaredDreadAmbusher(item, usageConfig, workflow);
         await applyDeclaredWeaponSpellRider(item, usageConfig, workflow);
-        ;
-        ;
-        ;
-        ;
-        ;
-        ;
+        await applyDeclaredAasimarRevelationDamage(item, usageConfig, workflow);
+        await applyVigilantBlessingFromUse(item, usageConfig, workflow);
+        await applyBardicInspirationFromUse(item, usageConfig, workflow);
+        await applyCountercharmFromUse(item, usageConfig, workflow);
+        await applyTwilightSanctuaryFromUse(item, usageConfig, workflow);
+        await applyAasimarRevelationFromUse(item, usageConfig, workflow);
         await applySimpleSpellMarkerAutomation(item, usageConfig, workflow);
         await applyLevel12SpellPostUse(item, usageConfig, workflow);
         await applyVampiricTouchHealingFromUse(item, usageConfig, workflow);
@@ -18293,7 +20753,7 @@ function patchMidiCompleteItemUse() {
       return workflow;
     } finally {
       releaseDeclaredActiveBuff(workflow);
-      ;
+      await cleanupDeclaredPowerAttackEffect(declaredPowerAttackEffect);
     }
   };
   midi.completeItemUse.__arcaneVowPatch = true;
@@ -18530,13 +20990,13 @@ Hooks.once("ready", () => {
       error,
     );
   });
-  ;
-  ;
-  ;
-  ;
-  ;
-  ;
-  ;
+  patchActorStudioArcaneSpellPack();
+  Hooks.on("getSceneControlButtons", hideFthCharacterCreatorControl);
+  Hooks.on("renderApplicationV2", injectBg3ShortRestButton);
+  hideCurrentFthCharacterCreatorControl();
+  Hooks.on("renderActorDirectory", hideNativeActorCreateButton);
+  Hooks.on("renderActorDirectory5e", hideNativeActorCreateButton);
+  Hooks.on("preCreateItem", (item) => preventDuplicateArcaneFeatCreate(item));
   Hooks.on("midi-qol.targetingComplete", workflow => {
     try {
       return filterCompilerWorkflowTargets(workflow);
@@ -18562,14 +21022,18 @@ Hooks.once("ready", () => {
       return false;
     }
   });
-  ;
+  Hooks.on("createItem", (item, options, userId) => {
+    handleRangerTcePatchCreate(item, options, userId).catch(error => {
+      console.warn("[" + MODULE_ID + "] Ranger TCE patch failed", error);
+    });
+  });
   Hooks.on("deleteActiveEffect", (effect, options) => {
     if (nativeSummonEntityLifecycleContract(effect)) {
       NATIVE_SUMMON_LIFECYCLE_DELETIONS.delete(effect.uuid);
     }
     scheduleCompilerPhysicalSizeSync(effect);
     Promise.all([
-      
+      cleanupFavoredFoeTargets(effect),
       cleanupSourceTargetDamageMirrorCounterpart(effect),
       cleanupCompilerSourceWhenLastDependentEnds(effect, options),
       applyOutcomeRaceNaturalExpiry(effect, options),
@@ -18780,7 +21244,7 @@ Hooks.once("ready", () => {
   });
   Hooks.on("deleteActiveEffect", effect => {
     try {
-      if (!readSharedAutomationFlag(effect, "twilightSanctuary")) return true;
+      if (!effect?.getFlag?.(MODULE_ID, "twilightSanctuary")) return true;
       endTwilightSanctuaryRing(effect.id);
     } catch (_error) {}
     return true;
@@ -18789,7 +21253,7 @@ Hooks.once("ready", () => {
     try {
       for (const token of canvas.tokens?.placeables ?? []) {
         for (const effect of token.actor?.effects ?? []) {
-          if (!readSharedAutomationFlag(effect, "twilightSanctuary")) continue;
+          if (!effect?.getFlag?.(MODULE_ID, "twilightSanctuary")) continue;
           if (effect.isActive) continue;
           endTwilightSanctuaryRing(effect.id);
         }
@@ -18840,23 +21304,27 @@ Hooks.once("ready", () => {
       console.warn("[" + MODULE_ID + "] Compiler zone membership cleanup failed", error);
     });
   });
-  ;
-  ;
-  ;
-  ;
+  queueMicrotask(hideNativeActorCreateButton);
+  queueMicrotask(injectBg3ShortRestButtonsIntoOpenSheets);
+  configureActorStudioSpellSource().catch(error => {
+    console.warn(`[${MODULE_ID}] Actor Studio spell source configuration failed`, error);
+  });
+  configureMidiQolFullAutomationSettings().catch(error => {
+    console.warn(`[${MODULE_ID}] midi-qol automation configuration failed`, error);
+  });
   game.modules.get(HOST_MODULE_ID).api = {
     cancelNativeSummonUse,
     finalizeNativeSummonUse,
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    hideFthCharacterCreatorControl,
+    hideCurrentFthCharacterCreatorControl,
+    hideNativeActorCreateButton,
+    hasVowOfEnmityMarker,
+    applyVowOfEnmityAdvantage,
+    applyVowOfEnmityMarker,
+    applyVowOfEnmityMarkerFromUse,
+    configureMidiQolFullAutomationSettings,
+    migrateCharacterSpellInteractionContracts,
+    applyDeclaredDivineSmite,
     applyDeclaredWeaponSpellRider,
     dispatchPerSpellScript,
     dispatchPerSpellScriptActivity,
@@ -18899,28 +21367,28 @@ Hooks.once("ready", () => {
     applyDamageTriggeredRepeatSave,
     applyTargetStatusRemovalFromUse,
     applyProtectionFromPoisonSavingThrow,
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    applyRangerTceOptionalFeaturesPatch,
+    applyFavoredFoe,
+    applyVigilantBlessingFromUse,
+    grantBardicInspiration,
+    declareBardicInspirationUse,
+    applyBardicInspirationFromUse,
+    applyBardicInspirationAttack,
+    applyBardicInspirationSavingThrow,
+    applyCountercharmFromUse,
+    applyCountercharmSavingThrow,
+    applyTwilightSanctuaryFromUse,
     playTwilightSanctuaryRing,
     endTwilightSanctuaryRing,
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    applyAasimarRevelationFromUse,
+    applyDeclaredAasimarRevelationDamage,
+    applyRadiantConsumptionTurnEnd,
+    applyVampireRegenerationTurnStart,
+    suppressVampireRegenerationFromDamage,
+    applyRacialSavingThrowAutomation,
+    applySunlightSensitivityAttack,
+    applySavageAttacksDamageBonus,
+    applySavageAttackerHouseRuleReroll,
     applyFatalDamageInterceptionPreDamage,
     collectFatalDamageInterceptionCandidates,
     fatalDamageWouldKillOutright,
@@ -18929,12 +21397,12 @@ Hooks.once("ready", () => {
     bloodSeekingTemporaryHitPoints,
     bloodSeekingDamageEntryDefeated,
     applyBloodSeekingFromWorkflow,
-    
-    
-    
+    applyTurnUndeadFromWorkflow,
+    applyAuraOfProtectionSave,
+    applyAuraOfProtectionSavingThrow,
     isRangedWeaponAttack,
-    
-    
+    applyDuelingDamageBonus,
+    applyGreatWeaponFightingReroll,
     applyExtraDamageSegment,
     createDamageSummaryForItemCard,
     scheduleDamageSummaryForWorkflow,
@@ -18992,20 +21460,20 @@ Hooks.once("ready", () => {
     inheritCompilerTriggeredActivityScaling,
     applyLinkedOperationResultsFromUse,
     applyLifeTransferenceFromUse,
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    applyDeclaredDreadAmbusher,
+    applyDeclaredPowerAttackBeforeUse,
+    preventDuplicateArcaneFeatCreate,
+    applyDreadAmbusherInitiative,
+    applyDreadAmbusherTurnStart,
+    applyBg3ShortRestHealing,
+    bg3ShortRestQuota,
+    recoverBardicInspirationOnRest,
+    restActor,
+    restGroup,
+    injectBg3ShortRestButton,
+    injectBg3ShortRestButtonsIntoOpenSheets,
+    findNearbyAuraSources,
+    bestAuraSource,
     patchMidiCompleteItemUse,
     sourceActorUuidFromOrigin,
   };
@@ -19014,7 +21482,7 @@ Hooks.once("ready", () => {
 Hooks.on("midi-qol.preAttackRollConfig", workflow => {
   try {
     prepareSourceArmedAttackTransformAttack(workflow);
-    ;
+    applyVowOfEnmityAdvantage(workflow);
     applyDeclaredActiveBuffAttackConfig(workflow);
     applyCompilerNextTurnAttackAdvantage(workflow);
     applyCompilerBlurDisadvantage(workflow);
@@ -19065,7 +21533,7 @@ Hooks.on("dnd5e.preUseActivity", (activity, usageConfig) => {
     const item = activity?.item ?? workflow?.item;
     inheritCompilerFollowUpCastLevel(activity, item, usageConfig);
     preflightCompilerSelectionCardinality(activity, usageConfig, workflow);
-    const availability = readSharedAutomationFlag(activity, "availability")
+    const availability = activity?.getFlag?.(MODULE_ID, "availability")
       ?? activity?.flags?.[MODULE_ID]?.availability
       ?? null;
     const requiredArtifactId = String(
@@ -19173,14 +21641,21 @@ Hooks.on("dnd5e.preRollDamage", config => {
   }
 });
 
-;
+Hooks.on("dnd5e.preRollAttack", (config, dialog, message) => {
+  try {
+    applySunlightSensitivityAttack(config, dialog, message);
+    applyBardicInspirationAttack(config, dialog, message);
+  } catch (error) {
+    console.warn(`[${MODULE_ID}] Attack roll automation failed`, error);
+  }
+});
 
 Hooks.on("midi-qol.RollComplete", workflow => {
   const task = (async () => {
     const priorError = workflow?.__arcaneCompilerRuntimeError;
     if (priorError?.message) throw new Error(priorError.message);
-    ;
-    ;
+    applyVowOfEnmityMarker(workflow);
+    await applyTurnUndeadFromWorkflow(workflow);
     await applyCompilerRuntimePostUse(
       workflow?.activity?.item ?? workflow?.item,
       null,
@@ -19239,12 +21714,12 @@ Hooks.on("midi-qol.DamageRollComplete", async workflow => {
     await finalizeDeclaredWeaponSpellRiderDamage(workflow);
     await finalizeParentDamageRiders(workflow);
     await finalizeSourceAttackProximityRiders(workflow);
-    ;
-    ;
+    await applyGreatWeaponFightingReroll(workflow);
+    await applySavageAttackerHouseRuleReroll(workflow);
     await enforceCompilerWeaponDamageMinimum(workflow);
     await enforceCompilerWeaponHitDamageScale(workflow);
-    ;
-    ;
+    await applyDuelingDamageBonus(workflow);
+    await applySavageAttacksDamageBonus(workflow);
     return true;
   } catch (error) {
     recordCompilerRuntimeError(workflow, error, "damage-roll-complete");
@@ -19253,16 +21728,28 @@ Hooks.on("midi-qol.DamageRollComplete", async workflow => {
   }
 });
 
-;
+Hooks.on("dnd5e.preRollInitiative", (combatant, rollConfig) => {
+  try {
+    applyDreadAmbusherInitiative(combatant, rollConfig);
+    const actor = combatant?.actor;
+    const blessing = Array.from(actor?.effects ?? []).find(effect => effect.getFlag?.(MODULE_ID, "vigilantBlessing"));
+    if (blessing) {
+      rollConfig.advantage = true;
+      actor.deleteEmbeddedDocuments("ActiveEffect", [blessing.id]);
+    }
+  } catch (error) {
+    console.warn(`[${MODULE_ID}] Initiative automation failed`, error);
+  }
+});
 
 Hooks.on("dnd5e.preRollSavingThrow", (config, dialog, message) => {
   try {
-    ;
-    ;
+    applyCountercharmSavingThrow(config, dialog, message);
+    applyRacialSavingThrowAutomation(config, dialog, message);
     applyTriggeredRepeatSaveRollMode(config, message);
     applyProtectionFromPoisonSavingThrow(config, message);
-    ;
-    ;
+    applyBardicInspirationSavingThrow(config, dialog, message);
+    applyAuraOfProtectionSavingThrow(config, message);
   } catch (error) {
     console.warn(`[${MODULE_ID}] Saving throw automation failed`, error);
   }
@@ -19274,7 +21761,7 @@ Hooks.on("midi-qol.preTargetDamageApplication", async (target, context) => {
     captureExternalOperationArtifactTransitionsBeforeDamage(target, context);
     await captureEffectHostHitByAttackBeforeDamage(target, context);
     await applyTemporaryHitPointsRetaliation(target, context);
-    ;
+    await suppressVampireRegenerationFromDamage(target, context);
     await applyDamageTriggeredRepeatSave(target, context);
   } catch (error) {
     recordCompilerRuntimeError(
@@ -19337,7 +21824,7 @@ Hooks.on("dnd5e.applyDamage", (actor, amount, options) => {
 
 Hooks.on("dnd5e.restCompleted", async (actor, result) => {
   try {
-    ;
+    await recoverBardicInspirationOnRest(actor, result);
     await cleanupNativeSummonLifecycleOnLongRest(actor, result);
     if (result?.type === "long" || result?.longRest === true) {
       await resetBg3ShortRestQuotaForTarget(actor);
@@ -19360,7 +21847,7 @@ Hooks.on("updateCombat", async (combat, changed) => {
     if ("turn" in changed) {
       const previousTurn = changed.turn === 0 ? combat.turns.length - 1 : changed.turn - 1;
       const previousCombatant = combat.turns[previousTurn];
-      ;
+      await applyRadiantConsumptionTurnEnd(previousCombatant?.token?.object);
     }
     await applyCompilerFollowingAuraTurnStart(combat, changed);
     await applyCompilerZoneTurnEnd(combat, changed);
@@ -19370,8 +21857,8 @@ Hooks.on("updateCombat", async (combat, changed) => {
     await applySourceTurnStartProximityEffect(combat, changed);
     await applySpiritShroudTurnStart(combat, changed);
     await refreshTemporaryHitPointsSourcesAtTurnStart(combat, changed);
-    ;
-    ;
+    await applyDreadAmbusherTurnStart(combat, changed);
+    await applyVampireRegenerationTurnStart(combat, changed);
   } catch (error) {
     console.warn(`[${MODULE_ID}] Combat automation failed`, error);
   }
@@ -19382,7 +21869,8 @@ Hooks.on("deleteCombat", combat => {
     console.warn("[" + MODULE_ID + "] Combat-end runtime lifecycle cleanup failed", error);
   });
 });
-      const runtime = {mode: 'standalone', adapters: ["artifact-ended-outcome-v1","cast-origin-static-marker-v1","damage-mirror-heal-source-v1","damage-triggered-repeat-save-v1","declared-active-buff-v1","declared-weapon-spell-rider-v1","effect-host-hit-by-attack-v1","external-operation-artifact-transition-v1","fatal-damage-interception-v1","following-aura-event-activity-v1","hit-point-pool-allocator-v1","life-transference-v1","linked-operation-results-v1","magic-weapon-enchantment-v1","marked-target-parent-damage-v1","native-summon","native-summon-control-v1","outcome-race-v1","owned-weapon-attack-v1","placed-point-move-token-v1","required-selection-outcome-v1","reversible-hit-point-capacity-v1","sleep-hit-point-pool-v1","source-armed-attack-transform-v1","source-artifact-dismiss-v1","source-attack-proximity-rider-v1","source-bound-one-shot-v1","source-target-damage-mirror-v1","source-turn-check-v1","source-turn-start-proximity-effect-v1","spirit-shroud-hit-v1","spirit-shroud-turn-start-v1","status-effect-suppression-v1","target-status-removal-v1","temporary-hit-points-refresh-v1","temporary-hit-points-retaliation-v1","temporary-hit-points-source-v1","triggered-event-activity-v1","typed-damage-dispatcher-v2","weapon-enchantment-v1","workflow-outcome-activity-v1","workflow-outcome-forced-movement-v1","workflow-outcome-operations-v1","zone-event-activity-v1"],
+
+      const runtime = {mode: 'standalone', kind: 'full', adapters: ["artifact-ended-outcome-v1","cast-origin-static-marker-v1","damage-mirror-heal-source-v1","damage-triggered-repeat-save-v1","declared-active-buff-v1","declared-weapon-spell-rider-v1","effect-host-hit-by-attack-v1","external-operation-artifact-transition-v1","fatal-damage-interception-v1","following-aura-event-activity-v1","hit-point-pool-allocator-v1","life-transference-v1","linked-operation-results-v1","magic-weapon-enchantment-v1","marked-target-parent-damage-v1","native-summon","native-summon-control-v1","outcome-race-v1","owned-weapon-attack-v1","placed-point-move-token-v1","required-selection-outcome-v1","reversible-hit-point-capacity-v1","sleep-hit-point-pool-v1","source-armed-attack-transform-v1","source-artifact-dismiss-v1","source-attack-proximity-rider-v1","source-bound-one-shot-v1","source-target-damage-mirror-v1","source-turn-check-v1","source-turn-start-proximity-effect-v1","spirit-shroud-hit-v1","spirit-shroud-turn-start-v1","status-effect-suppression-v1","target-status-removal-v1","temporary-hit-points-refresh-v1","temporary-hit-points-retaliation-v1","temporary-hit-points-source-v1","triggered-event-activity-v1","typed-damage-dispatcher-v2","weapon-enchantment-v1","workflow-outcome-activity-v1","workflow-outcome-forced-movement-v1","workflow-outcome-operations-v1","zone-event-activity-v1"],
         abortInitialization() {
           if (readyStarted) throw new Error('Runtime already started; reload the world to change modules');
           for (const [name, id] of registered) nativeHooks.off(name, id);

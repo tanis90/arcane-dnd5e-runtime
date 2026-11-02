@@ -17,8 +17,8 @@ test('every published workspace package passes the tarball content audit', async
   const results = await auditAllPackages(root);
   assert.deepEqual(results.map(result => result.name).sort(), [
     '@arcanedesk/automation-contracts',
+    '@arcanedesk/dnd5e-runtime',
     '@arcanedesk/spell-compiler',
-    '@arcanedesk/spell-runtime-sdk',
   ]);
   assert.equal(results.length, PACKAGE_NAMES.length);
   for (const result of results) {
@@ -28,4 +28,7 @@ test('every published workspace package passes the tarball content audit', async
   }
   const compiler = results.find(result => result.name === '@arcanedesk/spell-compiler');
   assert(compiler.files.includes('src/data/spell-automation/dsl.mjs'));
+  const runtime = results.find(result => result.name === '@arcanedesk/dnd5e-runtime');
+  assert(runtime.files.includes('dist/dnd5e-runtime.mjs'));
+  assert(!runtime.files.some(file => file.includes('spell-runtime')));
 });

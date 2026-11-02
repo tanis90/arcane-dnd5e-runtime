@@ -15,25 +15,29 @@ not a claim that either host has switched.
    never evaluates code or touches a world on import.
 4. Versioned enforcement. Every installed runtime is identified by package
    version, schema version, enforced profile version, source hash and build hash.
-5. Generated artifacts are immutable. `dist/spell-runtime.mjs` and
+5. Generated artifacts are immutable. `dist/dnd5e-runtime.mjs` and
    `dist/manifest.json` are rebuilt, never hand-edited. The source baseline hash
    changes only after human review.
 6. A green build/VM suite is installation evidence, not live dual-host combat
    certification.
 
-## Stage A: independent SDK (this batch)
+## Stage A: complete runtime SDK and compiler (this batch)
 
 Deliverables:
 
-- `@arcanedesk/spell-runtime-sdk@0.1.0`, schema `1`, Node `>=22.12`.
+- `@arcanedesk/dnd5e-runtime@0.1.0`, schema `1`, Node `>=22.12`.
+- One full browser artifact, `dist/dnd5e-runtime.mjs`, with factory
+  `initializeDnd5eRuntime`. All class, ancestry, UI and spell hooks/API entries
+  are retained; there is no spell-only projection.
 - `@arcanedesk/spell-compiler@0.9.0` with the existing DSL/compiler exports,
   explicit Node `>=24 <25`, and an original mechanism fixture.
-- `readRuntimeSource()` and `buildSpellRuntime()` compatibility APIs.
-- `createAuto2014Runtime()` with a manifest and explicit `initialize(host)`
-  delegation.
-- Reviewed source baseline and deterministic `dist/` build.
-- Real Node `vm` tests for idempotency, class-hook exclusion, rollback, ready API,
-  legacy ownership and public host delegation.
+- `readRuntimeSource()` and `buildDnd5eRuntime()` APIs.
+- `createDnd5eRuntime()` with a manifest and explicit `initialize(host)`
+  delegation; `createAuto2014Runtime` is only a compatibility alias.
+- Reviewed full source baseline and deterministic `dist/` build.
+- Real Node `vm` tests comparing the full initializer's 54 hook registrations and
+  163 API keys exactly with the current complete runtime, plus self-identity,
+  idempotency, rollback, ready API and long-rest behavior.
 - Real compiler tests for DSL → deterministic plan → `runtimePlan` → runtime
   availability, plus explicit negative cases.
 - Release-content checks over the repository and every package tarball: file
@@ -49,10 +53,11 @@ Exit criteria for this closure: `npm ci`, all workspace tests, `npm run build`,
 ### B1. Pin the runtime
 
 Add the SDK as a pinned dependency of the VTT build. Record the manifest's
-`version`, `schemaVersion`, `sourceHash`, `buildHash` and enforced profile
-`arcane-dnd5e-2014` version `1` in the build record. The VTT package should
-contain only the generated `dist/spell-runtime.mjs` and manifest, not another
-hand-maintained copy of `automation.js`.
+`version`, `schemaVersion`, `runtimeKind`, `factoryName`, `sourceHash`,
+`buildHash` and enforced profile `arcane-dnd5e-2014` version `1` in the build
+record. The VTT package should contain only the generated
+`dist/dnd5e-runtime.mjs` and manifest, not another hand-maintained copy of
+`automation.js`.
 
 ### B2. Extract the host adapter
 
@@ -63,9 +68,11 @@ Move the remaining host-specific wiring into a named VTT adapter:
 - world document lookup and Effect lifecycle calls;
 - rest orchestration and module availability checks.
 
-The adapter calls `initializeSpellRuntime({moduleId})` through the host
+The adapter calls `initializeDnd5eRuntime({moduleId})` through the host
 `evaluateInitializer` contract. It must not import the SDK and silently register
-hooks at module load time.
+hooks at module load time. The complete runtime's module identity rule applies:
+same-module source replacement is standalone; a different module with active old
+Auto is legacy and registers no hooks.
 
 ### B3. Migrate the long-rest hook
 
@@ -89,6 +96,7 @@ Do not cut over on unit tests alone. Required evidence:
 - complete Auto2014 regression suite (the current 1220-case chain);
 - R3 six-spell and long-rest gates, including Aid/Warding Bond/Death Ward/
   Heroism/Heroes' Feast/Harm cleanup behavior;
+- all 54 complete-runtime hook registrations and 163 API keys present;
 - real GM plus non-GM player dual-client gate with actual HP/effects/slots;
 - reload and rollback checks;
 - a diff showing the VTT adapter, not the rule implementation, is the only
@@ -159,8 +167,8 @@ The manifest hashes and the release record must match the restored artifact.
 ## Known limits
 
 - Stage B/C do not exist yet; VTT and FVTT remain on their existing wiring.
-- The SDK contains one reviewed dynamic import of the host's Aura Effects helper
-  module; that is a host dependency, not bundled content.
+- The full runtime contains one reviewed dynamic import of the host's Aura
+  Effects helper module; that is a host dependency, not bundled content.
 - The compiler is included in this repository, but production spell catalogues,
   licensed content bindings and live-host certification remain outside it.
 - The compiler's Node `>=24 <25` engine is explicit; the runtime SDK and browser
