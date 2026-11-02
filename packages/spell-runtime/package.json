@@ -1,0 +1,39 @@
+{
+  "name": "@arcanedesk/spell-runtime-sdk",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Runtime-only Auto 2014 spell automation SDK with a locked browser initializer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tanis90/arcane-spell-runtime.git",
+    "directory": "packages/spell-runtime"
+  },
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.12"
+  },
+  "exports": {
+    ".": "./src/index.mjs",
+    "./build": "./src/build.mjs",
+    "./availability": "./src/availability.mjs",
+    "./dist/spell-runtime.mjs": "./dist/spell-runtime.mjs",
+    "./dist/manifest.json": "./dist/manifest.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src/",
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "dependencies": {
+    "@arcanedesk/automation-contracts": "0.1.0",
+    "acorn": "8.18.0"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "prepack": "node ../../scripts/build.mjs"
+  }
+}

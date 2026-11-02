@@ -1,0 +1,21 @@
+{
+  "name": "arcane-spell-runtime-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Independent Auto 2014 spell runtime SDK workspace",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test packages/*/tests/*.test.mjs tests/*.test.mjs",
+    "test:compiler:node24": "npx -y node@24 --test packages/spell-compiler/tests/*.test.mjs",
+    "verify": "npm run build && npm test && npm run pack:check",
+    "pack:check": "node scripts/pack-check.mjs"
+  }
+}

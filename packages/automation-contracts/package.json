@@ -1,0 +1,32 @@
+{
+  "name": "@arcanedesk/automation-contracts",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Browser-safe automation contracts shared by the spell compiler and runtime",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tanis90/arcane-spell-runtime.git",
+    "directory": "packages/automation-contracts"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "exports": {
+    ".": "./src/runtime-profile.mjs",
+    "./runtime-profile": "./src/runtime-profile.mjs",
+    "./requirements": "./src/requirements.mjs",
+    "./semantics": "./src/semantics.mjs",
+    "./bindings": "./src/bindings.mjs",
+    "./runtime-adapters": "./src/runtime-adapters.mjs"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "dependencies": {
+    "@noble/hashes": "2.4.0"
+  }
+}

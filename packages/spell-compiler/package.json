@@ -1,0 +1,38 @@
+{
+  "name": "@arcanedesk/spell-compiler",
+  "version": "0.9.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Content-independent automation compiler and mechanism DSL used by Arcane Auto 2014",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "exports": {
+    ".": "./src/index.mjs",
+    "./dsl": "./src/data/spell-automation/dsl.mjs",
+    "./compiler": "./src/tools/lib/spell-automation-compiler.mjs",
+    "./emitter": "./src/tools/lib/spell-automation-emitter.mjs",
+    "./content": "./src/tools/lib/spell-automation-cleanroom.mjs",
+    "./runtime-profile": "./src/tools/lib/spell-automation-runtime-profile.mjs",
+    "./compose": "./src/tools/lib/compose-spell-item.mjs",
+    "./binding": "./src/tools/lib/spell-plan-binding.mjs"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tanis90/arcane-spell-runtime.git",
+    "directory": "packages/spell-compiler"
+  },
+  "dependencies": {
+    "@arcanedesk/automation-contracts": "0.1.0"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  }
+}
