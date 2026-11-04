@@ -13,7 +13,7 @@ The canonical machine-readable baseline is
 - 48 unique hook names
 - 163 API keys
 - source SHA256:
-  `874c0249322163d2cd2583efd9b1866cc714eb6147eac411f0a2a49847b5df65`
+  `8aed41397f3d22a065265177b4305ad6679b8dc315ea31ce267072583fafdfe4`
 
 The VM test executes the raw current runtime and the generated initializer and
 compares both complete sorted lists. No projection is applied.

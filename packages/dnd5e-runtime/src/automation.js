@@ -929,7 +929,8 @@ function nativeSummonOwnedTokens(predicate = () => true) {
 }
 
 function nativeSummonTokenIsLive(token) {
-  const hp = Number(token?.actor?.system?.attributes?.hp?.value);
+  if (!token?.actor) return false;
+  const hp = Number(token.actor.system?.attributes?.hp?.value);
   if (Number.isFinite(hp) && hp <= 0) return false;
   const statuses = token?.actor?.statuses instanceof Set
     ? token.actor.statuses
@@ -1029,11 +1030,22 @@ function prepareNativeSummonUse(activity, usageConfig = {}) {
     const liveChildren = nativeSummonOwnedTokens((provenance, token) =>
       provenance.parentTokenUuid === sourceToken.uuid
         && provenance.rootConcentrationEffectUuid === inheritedRootEffect.uuid
+        && provenance.artifactId === contract.marker.artifactId
+        && provenance.sourceItemUuid === activity.item.uuid
+        && String(provenance.sourceActivityId ?? "") === String(activity.id ?? "")
         && nativeSummonTokenIsLive(token)
     );
     if (liveChildren.length) {
+      const activityName = String(activity?.name ?? activity?.item?.name ?? "").trim()
+        || "This activity";
+      const profile = Array.from(activity?.profiles ?? []).find(candidate =>
+        String(candidate?._id ?? "") === contract.nativeProfileId
+      );
+      const profileName = String(profile?.name ?? contract.marker.profileId ?? "").trim()
+        || "summon";
       const error = new Error(
-        "Fallen Lover cannot summon another Wood Woad while its current Woad is alive",
+        activityName + " cannot summon another " + profileName
+        + " while its current " + profileName + " is alive",
       );
       error.arcaneNativeSummonRejectionCode = "ACTION_BLOCKED";
       throw error;
@@ -1063,9 +1075,6 @@ function prepareNativeSummonUse(activity, usageConfig = {}) {
       ? foundry.utils.deepClone(sourceProvenance)
       : null,
     inheritedRootEffectUuid: inheritedRootEffect?.uuid ?? null,
-    controlExpiresWorldTime: contract.marker.control
-      ? Number(game.time?.worldTime ?? 0) + Number(contract.marker.control.durationSeconds)
-      : null,
     preparedCount: 0,
     postSummonSeen: false,
     postSummonTokenUuids: [],
@@ -1157,9 +1166,6 @@ function nativeSummonPreparedProvenance(record, memberIndex) {
       ? record.inheritedRootEffectUuid
       : null,
     controlContractId: marker.control?.contractId ?? null,
-    controlExpiresWorldTime: marker.control
-      ? record.controlExpiresWorldTime
-      : null,
     lifecyclePolicy: marker.cleanup,
     lifecycleEffectUuid: null,
     controlEffectUuid: null,
@@ -1711,22 +1717,28 @@ function nativeSummonUntrackDependent(dependents, effectUuid, token) {
 
 function nativeSummonControlEffectContract(effect) {
   const value = effect?.flags?.[MODULE_ID]?.nativeSummonControl;
+  const keys = value && typeof value === "object" && !Array.isArray(value)
+    ? Object.keys(value).sort()
+    : null;
+  const legacyKeys = [
+    "artifactId",
+    "contractId",
+    "controllerActorUuid",
+    "expiresWorldTime",
+    "lastInvocationId",
+    "memberIndex",
+    "requestId",
+    "sourceItemUuid",
+    "tokenUuid",
+    "version",
+  ];
+  const currentKeys = legacyKeys.filter(key => key !== "expiresWorldTime");
   if (
-    !value
-    || typeof value !== "object"
-    || Array.isArray(value)
-    || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify([
-      "artifactId",
-      "contractId",
-      "controllerActorUuid",
-      "expiresWorldTime",
-      "lastInvocationId",
-      "memberIndex",
-      "requestId",
-      "sourceItemUuid",
-      "tokenUuid",
-      "version",
-    ])
+    !keys
+    || (
+      JSON.stringify(keys) !== JSON.stringify(currentKeys)
+      && JSON.stringify(keys) !== JSON.stringify(legacyKeys)
+    )
     || Number(value.version) !== NATIVE_SUMMON_CONTROL_VERSION
     || !String(value.contractId ?? "").trim()
     || !String(value.controllerActorUuid ?? "").trim()
@@ -1737,8 +1749,6 @@ function nativeSummonControlEffectContract(effect) {
     || !Number.isInteger(Number(value.memberIndex))
     || Number(value.memberIndex) < 0
     || !String(value.tokenUuid ?? "").trim()
-    || !Number.isFinite(Number(value.expiresWorldTime))
-    || Number(value.expiresWorldTime) <= 0
   ) return null;
   return value;
 }
@@ -1834,10 +1844,7 @@ async function nativeSummonCreateControlEffects(record, tokens) {
       transfer: false,
       disabled: false,
       changes: [],
-      duration: {
-        seconds: Number(control.durationSeconds),
-        startTime: Number(game.time?.worldTime ?? 0),
-      },
+      duration: {},
       statuses: [],
       flags: {
         [MODULE_ID]: {
@@ -1850,7 +1857,6 @@ async function nativeSummonCreateControlEffects(record, tokens) {
             requestId: record.requestId,
             memberIndex,
             tokenUuid: token.uuid,
-            expiresWorldTime: record.controlExpiresWorldTime,
             lastInvocationId: record.requestId,
           },
         },
@@ -1868,13 +1874,11 @@ async function nativeSummonCreateControlEffects(record, tokens) {
       !contract
       || effect.parent?.uuid !== token.actor.uuid
       || contract.tokenUuid !== token.uuid
-      || Number(contract.expiresWorldTime) !== Number(record.controlExpiresWorldTime)
     ) {
       throw new Error("native summon control effect failed exact materialization");
     }
     await nativeSummonWriteFinalProvenance(token, {
       controlEffectUuid: effect.uuid,
-      controlExpiresWorldTime: record.controlExpiresWorldTime,
     });
     effectUuids.push(effect.uuid);
   }
@@ -1959,7 +1963,6 @@ async function nativeSummonBindLifecycle(record, tokens) {
       mode: "control-duration-retain-entity",
       effectUuid: null,
       effectUuids,
-      expiresWorldTime: record.controlExpiresWorldTime,
     };
   }
   if (record.contract.marker.cleanup === "long-rest-or-defeat-or-dismiss") {
@@ -2418,7 +2421,6 @@ function activeNativeSummonControlEffect(actor, expected) {
       && contract.sourceItemUuid === expected.sourceItemUuid
       && contract.artifactId === expected.artifactId
       && contract.tokenUuid === expected.tokenUuid
-      && Number(contract.expiresWorldTime) > Number(game.time?.worldTime ?? 0)
     );
   });
   return matches.length === 1 ? matches[0] : null;
@@ -2518,7 +2520,7 @@ function guardNativeSummonControlAction(actor, item, activity, workflow, usageCo
     });
     if (!effect) {
       return nativeSummonControlPreflightBlock(
-        "A Reassert Control target has no exact, unexpired Arcane control effect.",
+        "A Reassert Control target has no exact active Arcane control effect.",
       );
     }
     members.push({
@@ -2527,9 +2529,6 @@ function guardNativeSummonControlAction(actor, item, activity, workflow, usageCo
       effectUuid: effect.uuid,
       requestId: provenance.requestId,
       memberIndex: provenance.memberIndex,
-      previousExpiresWorldTime: Number(
-        nativeSummonControlEffectContract(effect).expiresWorldTime,
-      ),
     });
   }
   if (workflow && typeof workflow === "object") {
@@ -2618,7 +2617,6 @@ async function applyNativeSummonControlFromUseCore(item, usageConfig, workflow) 
     return true;
   }
   const now = Number(game.time?.worldTime ?? 0);
-  const expiresWorldTime = now + Number(contract.durationSeconds);
   const receipt = existing && typeof existing === "object"
     ? foundry.utils.deepClone(existing)
     : {
@@ -2633,7 +2631,6 @@ async function applyNativeSummonControlFromUseCore(item, usageConfig, workflow) 
         artifactId: contract.artifactId,
         contractId: contract.contractId,
         startedWorldTime: now,
-        expiresWorldTime,
         completed: [],
         pending: snapshot.members.map(member => member.tokenUuid),
         retry: false,
@@ -2662,25 +2659,8 @@ async function applyNativeSummonControlFromUseCore(item, usageConfig, workflow) 
       throw new Error("Reassert Control lost an exact target control effect after consumption");
     }
     await effect.update({
-      "duration.seconds": Number(contract.durationSeconds),
-      "duration.startTime": now,
-      ["flags." + MODULE_ID + ".nativeSummonControl.expiresWorldTime"]:
-        expiresWorldTime,
       ["flags." + MODULE_ID + ".nativeSummonControl.lastInvocationId"]:
         snapshot.invocationId,
-    });
-    const tokenDocument = await fromUuid(member.tokenUuid).catch(() => null);
-    if (tokenDocument?.documentName !== "Token") {
-      receipt.status = "partial";
-      receipt.retry = false;
-      receipt.error = "token-missing-after-effect-refresh:" + member.tokenUuid;
-      await writeNativeSummonControlReceipt(sourceActor, receipt);
-      workflow.__arcaneNativeSummonControlReceipt = foundry.utils.deepClone(receipt);
-      throw new Error("Reassert Control target Token disappeared after effect refresh");
-    }
-    await nativeSummonWriteFinalProvenance(tokenDocument, {
-      controlEffectUuid: effect.uuid,
-      controlExpiresWorldTime: expiresWorldTime,
     });
     receipt.completed.push({
       tokenUuid: member.tokenUuid,
@@ -2688,8 +2668,6 @@ async function applyNativeSummonControlFromUseCore(item, usageConfig, workflow) 
       effectUuid: member.effectUuid,
       requestId: member.requestId,
       memberIndex: member.memberIndex,
-      previousExpiresWorldTime: member.previousExpiresWorldTime,
-      expiresWorldTime,
     });
     receipt.pending = receipt.pending.filter(uuid => uuid !== member.tokenUuid);
     await writeNativeSummonControlReceipt(sourceActor, receipt);
@@ -2761,6 +2739,31 @@ async function cleanupNativeSummonLifecycleForDeletedToken(token) {
   return true;
 }
 
+async function cleanupNativeSummonChildrenForDeletedToken(token) {
+  if (!isPrimaryAutomationGM()) return true;
+  const parentTokenUuid = String(token?.uuid ?? "").trim();
+  if (!parentTokenUuid) return true;
+  const byScene = new Map();
+  for (const scene of Array.from(game.scenes ?? [])) {
+    const tokenIds = [];
+    for (const child of Array.from(scene?.tokens ?? [])) {
+      const provenance = nativeSummonProvenance(child);
+      if (provenance?.parentTokenUuid !== parentTokenUuid) continue;
+      const tokenId = String(child?.id ?? "").trim();
+      if (tokenId) tokenIds.push(tokenId);
+    }
+    if (tokenIds.length) byScene.set(scene, [...new Set(tokenIds)]);
+  }
+  for (const [scene, tokenIds] of byScene) {
+    try {
+      await scene.deleteEmbeddedDocuments("Token", tokenIds);
+    } catch (_error) {
+      // A concurrent deletion already removed the child Token batch.
+    }
+  }
+  return true;
+}
+
 async function nativeSummonLifecycleEffectForMember(provenance, tokenUuid) {
   const effectUuid = String(provenance?.lifecycleEffectUuid ?? "").trim();
   const memberTokenUuid = String(tokenUuid ?? "").trim();
@@ -2824,11 +2827,115 @@ async function cleanupNativeSummonLifecycleForDefeatedCombatant(combatant) {
   return true;
 }
 
+function nativeSummonControlSourceUuids(actor) {
+  const uuids = new Set();
+  const add = value => {
+    const text = String(value ?? "").trim();
+    if (text) uuids.add(text);
+  };
+  add(actor?.uuid);
+  add(actor?.parent?.uuid);
+  add(actor?.token?.uuid);
+  add(actor?.token?.actor?.uuid);
+  const tokenUuid = String(actor?.token?.uuid ?? "").trim();
+  if (tokenUuid) {
+    add(
+      tokenUuid + ".Actor." + String(
+        actor?.token?.actorId ?? actor?.token?.actor?.id ?? actor?.id ?? "",
+      ),
+    );
+  }
+  const actorId = String(actor?.id ?? "").trim();
+  for (const scene of Array.from(game.scenes ?? [])) {
+    for (const token of Array.from(scene?.tokens ?? [])) {
+      const tokenActor = token?.actor ?? null;
+      if (
+        (actorId && String(token?.actorId ?? "") === actorId)
+        || (actor?.uuid && String(tokenActor?.uuid ?? "") === String(actor.uuid))
+      ) {
+        add(token?.uuid);
+        add(tokenActor?.uuid);
+        if (token?.uuid) {
+          add(
+            String(token.uuid) + ".Actor." + String(
+              token?.actorId ?? tokenActor?.id ?? "",
+            ),
+          );
+        }
+      }
+    }
+  }
+  return uuids;
+}
+
+function nativeSummonControlSourceMatches(provenance, sourceUuids) {
+  const sourceActorUuid = String(provenance?.sourceActorUuid ?? "").trim();
+  const sourceTokenUuid = String(provenance?.sourceTokenUuid ?? "").trim();
+  return Boolean(
+    (sourceActorUuid && sourceUuids.has(sourceActorUuid))
+    || (sourceTokenUuid && sourceUuids.has(sourceTokenUuid))
+  );
+}
+
+async function releaseNativeSummonControlCore(actor) {
+  const sourceUuids = nativeSummonControlSourceUuids(actor);
+  const retained = nativeSummonOwnedTokens((provenance, token) =>
+    provenance.lifecyclePolicy === "retain-entity"
+    && String(provenance.controlContractId ?? "").trim()
+    && nativeSummonControlSourceMatches(provenance, sourceUuids)
+  );
+  for (const { token, provenance } of retained) {
+    const tokenActor = token?.actor;
+    if (!tokenActor) continue;
+    const contractId = String(provenance.controlContractId ?? "").trim();
+    const requestId = String(provenance.requestId ?? "").trim();
+    const effects = Array.from(tokenActor.effects ?? []).filter(effect => {
+      const contract = nativeSummonControlEffectContract(effect);
+      return Boolean(
+        contract
+        && contract.contractId === contractId
+        && (!requestId || contract.requestId === requestId)
+        && contract.tokenUuid === token.uuid
+        && contract.controllerActorUuid === provenance.sourceActorUuid
+        && contract.sourceItemUuid === provenance.sourceItemUuid
+        && contract.artifactId === provenance.artifactId
+      );
+    });
+    if (effects.length) {
+      await tokenActor.deleteEmbeddedDocuments(
+        "ActiveEffect",
+        effects.map(effect => effect.id),
+      );
+    }
+    if (tokenActor.isToken === true) {
+      const current = tokenActor.ownership ?? tokenActor._source?.ownership ?? {};
+      const ownership = { default: 0 };
+      let changed = Number(current.default ?? 0) !== 0;
+      for (const userId of Object.keys(current)) {
+        if (userId === "default") continue;
+        ownership[userId] = 0;
+        if (Number(current[userId] ?? 0) !== 0) changed = true;
+      }
+      if (changed) await tokenActor.update({ ownership });
+    }
+  }
+  return true;
+}
+
+async function releaseNativeSummonControlOnLongRest(actor) {
+  if (!actor || !isPrimaryAutomationGM()) return true;
+  return queueNativeSummonControlActor(
+    actor,
+    () => releaseNativeSummonControlCore(actor),
+  );
+}
+
 async function cleanupNativeSummonLifecycleOnLongRest(actor, result) {
   if (
     (result?.type !== "long" && result?.longRest !== true)
     || !isPrimaryAutomationGM()
   ) return true;
+  await releaseNativeSummonControlOnLongRest(actor);
   const effects = Array.from(actor?.effects ?? []).filter(effect => {
     const contract = nativeSummonEntityLifecycleContract(effect);
     return contract?.sourceActorUuid === actor.uuid;
@@ -5770,42 +5877,6 @@ function blockedActionForActor(actor, item, activity) {
   const isAttack = activity?.type === "attack";
   const isReaction = activationType === "reaction";
   const isAction = activationType === "action";
-  const summonProvenance = actor.flags?.[MODULE_ID]?.nativeSummon;
-  if (
-    summonProvenance?.lifecyclePolicy === "retain-entity"
-    && summonProvenance.controlContractId
-  ) {
-    const activeControl = activeNativeSummonControlEffect(actor, {
-      contractId: summonProvenance.controlContractId,
-      controllerActorUuid: summonProvenance.sourceActorUuid,
-      sourceItemUuid: summonProvenance.sourceItemUuid,
-      artifactId: summonProvenance.artifactId,
-      tokenUuid: summonProvenance.tokenUuid
-        ?? summonProvenance.sourceTokenUuid,
-    }) ?? Array.from(actor.effects ?? []).find(effect => {
-      const control = nativeSummonControlEffectContract(effect);
-      return Boolean(
-        effect.disabled !== true
-        && effect.active !== false
-        && effect.isSuppressed !== true
-        && control
-        && control.contractId === summonProvenance.controlContractId
-        && control.controllerActorUuid === summonProvenance.sourceActorUuid
-        && control.sourceItemUuid === summonProvenance.sourceItemUuid
-        && control.artifactId === summonProvenance.artifactId
-        && Number(control.expiresWorldTime) > Number(game.time?.worldTime ?? 0)
-      );
-    });
-    if (!activeControl) {
-      return {
-        kind: "control-expired",
-        effectId: null,
-        effectName: "Create Undead Control Expired",
-        message: String(actor.name ?? "Summoned creature")
-          + " is no longer under the caster's active Create Undead control.",
-      };
-    }
-  }
   if (!isSpell && !isAttack && !isReaction && !isAction) return null;
   for (const effect of Array.from(actor.effects ?? [])) {
     if (
@@ -21067,6 +21138,7 @@ Hooks.once("ready", () => {
   });
   Hooks.on("deleteToken", token => {
     const cleanup = async () => {
+      await cleanupNativeSummonChildrenForDeletedToken(token);
       await cleanupNativeSummonCombatantsForDeletedToken(token);
       await cleanupNativeSummonLifecycleForDeletedToken(token);
     };
