@@ -8427,6 +8427,105 @@ async function applyHitPointPoolArtifact(
   return created;
 }
 
+function hostHpPoolSettlementComplete(workflow) {
+  // First-party web/spell-runtime/hp-pool-runtime.mjs owns pool allocation at
+  // midi-qol.targetingComplete. It settles the pool on the same Workflow and
+  // shrinks workflow.targets before native ApplyDynamicEffects runs. Once the
+  // host marks a Workflow as processed, the receipt is authoritative: a valid
+  // success/failure/empty receipt means this runtime must not roll or apply a
+  // second time, and a malformed receipt must fail closed instead of falling
+  // back to the ordinary allocator.
+  if (workflow?.__mtHpPoolProcessed !== true) return false;
+  const malformed = (reason) => {
+    throw new Error(
+      "hit-point-pool-allocator-v1 host settlement receipt is malformed: "
+        + reason,
+    );
+  };
+  const settlement = workflow.__mtHpPool;
+  if (
+    !settlement
+    || typeof settlement !== "object"
+    || Array.isArray(settlement)
+  ) {
+    malformed("__mtHpPool is missing or not an object");
+  }
+  const pool = settlement.pool;
+  if (!pool || typeof pool !== "object" || Array.isArray(pool)) {
+    malformed("pool is missing or not an object");
+  }
+  const formula = typeof pool.formula === "string" ? pool.formula.trim() : "";
+  const castLevel = pool.castLevel;
+  if (typeof pool.formula !== "string") {
+    malformed("formula is not a string");
+  }
+  if (
+    typeof castLevel !== "number"
+    || !Number.isInteger(castLevel)
+    || castLevel < 0
+  ) {
+    malformed("castLevel is not a non-negative integer");
+  }
+  if (!Array.isArray(pool.affected)) malformed("affected is not an array");
+  if (!Array.isArray(pool.skipped)) malformed("skipped is not an array");
+  if (!Array.isArray(settlement.affectedTokens)) {
+    malformed("affectedTokens is not an array");
+  }
+  if (!Array.isArray(settlement.skippedTokens)) {
+    malformed("skippedTokens is not an array");
+  }
+  if (
+    pool.error != null
+    && (typeof pool.error !== "string" || pool.error.trim().length === 0)
+  ) {
+    malformed("error must be a non-empty string");
+  }
+  if (pool.empty !== undefined && typeof pool.empty !== "boolean") {
+    malformed("empty must be a boolean");
+  }
+  const failed = typeof pool.error === "string" && pool.error.trim().length > 0;
+  const empty = pool.empty === true;
+  if (failed && empty) malformed("receipt cannot be both empty and failed");
+  const hasTotal = pool.total !== null && pool.total !== undefined;
+  const hasRemaining = pool.remaining !== null && pool.remaining !== undefined;
+  if (empty) {
+    if (!formula) malformed("empty receipt needs a formula");
+    if (hasTotal || hasRemaining) {
+      malformed("empty receipt must not carry pool totals");
+    }
+    if (
+      pool.affected.length
+      || pool.skipped.length
+      || settlement.affectedTokens.length
+      || settlement.skippedTokens.length
+    ) {
+      malformed("empty receipt must not carry affected or skipped entries");
+    }
+    return true;
+  }
+  if (failed) {
+    if (hasTotal || hasRemaining) {
+      malformed("failed receipt must null pool totals");
+    }
+    if (pool.affected.length || settlement.affectedTokens.length) {
+      malformed("failed receipt must not carry affected entries");
+    }
+    return true;
+  }
+  if (!formula) malformed("successful receipt needs a formula");
+  if (
+    typeof pool.total !== "number"
+    || !Number.isFinite(pool.total)
+    || pool.total < 0
+    || typeof pool.remaining !== "number"
+    || !Number.isFinite(pool.remaining)
+    || pool.remaining < 0
+  ) {
+    malformed("successful receipt needs non-negative numeric total and remaining");
+  }
+  return true;
+}
+
 async function applyHitPointPoolAllocatorFromUse(item, usageConfig, workflow) {
   const semanticActionId = workflowSemanticActionId(workflow);
   const allRules = compilerRuntimeRulesForAdapter(
@@ -8448,6 +8547,9 @@ async function applyHitPointPoolAllocatorFromUse(item, usageConfig, workflow) {
       "hit-point-pool-allocator-v1 requires exactly one runtime rule per action",
     );
   }
+  // The first-party host already rolled, allocated and reshaped this Workflow's
+  // targets. Re-rolling here would double both the pool and the applied artifacts.
+  if (hostHpPoolSettlementComplete(workflow)) return true;
   const rule = rules[0];
   const operations = (rule.operations ?? []).filter(operationValue =>
     operationValue.type === "allocate-hit-point-pool"
@@ -20367,6 +20469,24 @@ function independentProjectileChildWorkflow(workflow) {
   );
 }
 
+function firstPartyProjectileOwnerWorkflow(workflow, usageConfig) {
+  // First-party web/spell-runtime/projectile-runtime.mjs executes the complete
+  // plan itself: the parent shot plus one real completeActivityUse per child.
+  // It stamps __mtProjectileOwner on every usage it creates. Midi composes the
+  // real Workflow.workflowOptions from usage.midiOptions + midiOptions.workflowOptions
+  // (midi-qol.js:7113), so the parent and every child carry the marker there.
+  // The marker means exactly one owner and is usage data, not a global. Only a
+  // workflow that carries it skips this runtime's own projectile orchestration;
+  // ordinary item.use and the runtime's direct path have no marker and are
+  // unchanged.
+  return workflow?.workflowOptions?.__mtProjectileOwner === true
+    || workflow?.options?.__mtProjectileOwner === true
+    || workflow?.options?.workflowOptions?.__mtProjectileOwner === true
+    || workflow?.midiOptions?.__mtProjectileOwner === true
+    || usageConfig?.midiOptions?.__mtProjectileOwner === true
+    || usageConfig?.midiOptions?.workflowOptions?.__mtProjectileOwner === true;
+}
+
 function independentProjectileAllocationFromUse(usageConfig, workflow) {
   const candidates = [
     usageConfig?.arcaneProjectileAllocation,
@@ -20447,6 +20567,7 @@ async function applyIndependentProjectilesFromUse(item, usageConfig, workflow) {
     !workflow
     || workflow.aborted === true
     || independentProjectileChildWorkflow(workflow)
+    || firstPartyProjectileOwnerWorkflow(workflow, usageConfig)
     || !isPrimaryAutomationGM()
   ) return false;
   const resolution = compilerIndependentProjectilesContract(item, workflow);

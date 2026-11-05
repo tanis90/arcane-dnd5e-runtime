@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sha256": "8aed41397f3d22a065265177b4305ad6679b8dc315ea31ce267072583fafdfe4",
+  "sha256": "a92843bd942d0c3ed90f3a8ac827f6a6cf7550638cbeb3169b3ad0be2ccd25b8",
   "source": {
     "path": "src/automation.js",
     "origin": "Current tested complete VTT runtime copy"
@@ -12,7 +12,7 @@
   },
   "review": {
     "status": "manually-reviewed",
-    "reviewedOn": "2026-11-02",
+    "reviewedOn": "2026-11-06",
     "refreshPolicy": "manual-only",
     "note": "Never refresh this hash automatically in CI. This is the complete runtime baseline; it is wrapped as a full initializer without hook or API projection."
   },
@@ -24,6 +24,14 @@
     {
       "name": "Dread Ambusher effect icon",
       "summary": "The Dread Ambusher effect keeps the tested host icon path modules/arcane-dnd5e-2014-automation/Nicons/Ability_Ambush.png instead of the upstream game-icons shadow-follower.svg path."
+    },
+    {
+      "name": "First-party HP pool ownership handshake",
+      "summary": "applyHitPointPoolAllocatorFromUse recognizes the first-party hp-pool-runtime settlement receipt (__mtHpPoolProcessed + a strictly shaped __mtHpPool) on the same Workflow and returns true without a second roll, artifact or chat message. Valid success, explicit failure and explicit empty-target receipts all suppress the runtime allocator; a processed marker with a malformed receipt throws instead of falling back."
+    },
+    {
+      "name": "First-party independent-projectile ownership handshake",
+      "summary": "applyIndependentProjectilesFromUse skips its own projectile chain only when the real workflowOptions (or usage midiOptions) carries __mtProjectileOwner, which first-party projectileCastUsage sets on the parent and every child. The runtime direct path, its child guard and receipts are unchanged."
     }
   ]
 }

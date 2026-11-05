@@ -19,21 +19,21 @@
   "moduleId": "arcane-dnd5e-2014-automation",
   "source": {
     "path": "src/automation.js",
-    "bytes": 782633,
-    "sha256": "8aed41397f3d22a065265177b4305ad6679b8dc315ea31ce267072583fafdfe4"
+    "bytes": 787629,
+    "sha256": "a92843bd942d0c3ed90f3a8ac827f6a6cf7550638cbeb3169b3ad0be2ccd25b8"
   },
-  "sourceHash": "8aed41397f3d22a065265177b4305ad6679b8dc315ea31ce267072583fafdfe4",
+  "sourceHash": "a92843bd942d0c3ed90f3a8ac827f6a6cf7550638cbeb3169b3ad0be2ccd25b8",
   "artifact": {
     "path": "dist/dnd5e-runtime.mjs",
-    "bytes": 786445,
-    "sha256": "34877c20a7c2981d9df5b2ccd73f57ece72a86c202d12f71b0e3e7a0aac60af0"
+    "bytes": 791441,
+    "sha256": "eacf0612f150659b6cfe090f1c119dff812e1751ef0bcbea4355be2a0d0b50bf"
   },
-  "buildHash": "34877c20a7c2981d9df5b2ccd73f57ece72a86c202d12f71b0e3e7a0aac60af0",
+  "buildHash": "eacf0612f150659b6cfe090f1c119dff812e1751ef0bcbea4355be2a0d0b50bf",
   "contentPolicy": "runtime-only",
   "contentPolicySummary": "Complete DND5E 2014 runtime mechanics only; no spell descriptions, compendium documents, images, translations or world state.",
   "baseline": {
     "path": "src/source-baseline.json",
-    "sha256": "ebf39697c26f5b1559679064d8fa1faaba0af86a0e3631d00a668980d4402cd5",
+    "sha256": "3f0eb2af084da89a7935fc7c109ad63ede41b7caaa7ad6054d5ae234819f1ac3",
     "refreshPolicy": "manual-only"
   },
   "provenance": {
@@ -41,10 +41,12 @@
     "upstreamCommit": "f91719cf19cc8208e7568c6d31b1e18c3e43deab",
     "upstreamSourceSha256": "83e5edbe453ea0e8e61e9a95852c2fc8a4ff746c996f93bec7c51f56d509c54d",
     "testedRuntimeOrigin": "Current tested complete VTT runtime copy",
-    "testedRuntimeSha256": "8aed41397f3d22a065265177b4305ad6679b8dc315ea31ce267072583fafdfe4",
+    "testedRuntimeSha256": "a92843bd942d0c3ed90f3a8ac827f6a6cf7550638cbeb3169b3ad0be2ccd25b8",
     "reviewedDifferences": [
       "longRestCleanup compatibility shim",
-      "Dread Ambusher effect icon"
+      "Dread Ambusher effect icon",
+      "First-party HP pool ownership handshake",
+      "First-party independent-projectile ownership handshake"
     ]
   },
   "generatedBy": "scripts/build.mjs"

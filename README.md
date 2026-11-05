@@ -153,7 +153,7 @@ here; callers pass their own acceptance source.
 - Upstream public source: `tanis90/arcanedesk-fvtt-mods`
   at `f91719cf19cc8208e7568c6d31b1e18c3e43deab`.
 - Runtime source baseline: SHA256
-  `8aed41397f3d22a065265177b4305ad6679b8dc315ea31ce267072583fafdfe4`.
+  `a92843bd942d0c3ed90f3a8ac827f6a6cf7550638cbeb3169b3ad0be2ccd25b8`.
 - The upstream runtime file at that commit has SHA256
   `83e5edbe453ea0e8e61e9a95852c2fc8a4ff746c996f93bec7c51f56d509c54d`.
 - The complete source retains the `longRestCleanup` reversible-hit-point

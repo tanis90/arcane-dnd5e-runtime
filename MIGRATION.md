@@ -78,13 +78,13 @@ from a stale container or a spell-only projection. The reviewed record lives in
 `packages/dnd5e-runtime/src/source-baseline.json`:
 
 - Copied source SHA256:
-  `8aed41397f3d22a065265177b4305ad6679b8dc315ea31ce267072583fafdfe4`.
+  `a92843bd942d0c3ed90f3a8ac827f6a6cf7550638cbeb3169b3ad0be2ccd25b8`.
 - Upstream commit:
   `f91719cf19cc8208e7568c6d31b1e18c3e43deab`.
 - Upstream source SHA256:
   `83e5edbe453ea0e8e61e9a95852c2fc8a4ff746c996f93bec7c51f56d509c54d`.
 
-The complete source retains the two tested differences:
+The complete source retains these tested differences:
 
 1. `cleanupReversibleHitPointCapacity(effect, options)` skips the second
    current-hit-point adjustment when the host deletes a registered reversible
@@ -94,6 +94,15 @@ The complete source retains the two tested differences:
 2. The Dread Ambusher effect keeps the tested host icon path
    `modules/arcane-dnd5e-2014-automation/Nicons/Ability_Ambush.png` instead of
    the upstream game-icons SVG path.
+3. `applyHitPointPoolAllocatorFromUse` recognizes the first-party HP pool
+   settlement receipt (`__mtHpPoolProcessed` plus a strictly shaped
+   `__mtHpPool`) and returns without a second roll, artifact or chat message.
+   Success, explicit failure and explicit empty-target receipts are all accepted;
+   a processed marker with a malformed receipt throws instead of falling back.
+4. `applyIndependentProjectilesFromUse` honors `__mtProjectileOwner` on the real
+   `workflowOptions`/usage paths, so the first-party projectile runtime remains
+   the only orchestrator for the workflows it creates. The runtime direct path,
+   child guard and receipts are unchanged.
 
 The full runtime test baseline contains 54 hook registrations (48 unique names)
 and 163 API keys. It is stored in
