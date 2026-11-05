@@ -29,7 +29,7 @@ test('documentation covers the SDK boundary and staged host migration', async ()
   ));
   const required = {
     readme: ['runtime-only', 'createDnd5eRuntime', 'evaluateInitializer', 'not a claim',
-      'a92843bd942d0c3ed90f3a8ac827f6a6cf7550638cbeb3169b3ad0be2ccd25b8'],
+      '27b13a64bb1c1f71684eee48726371921f4d05e38efd053ac56b55b7983e684c'],
     migration: ['longRestCleanup', 'Dread Ambusher', 'rollback', 'source-baseline.json',
       '@arcanedesk/dnd5e-runtime'],
     evolution: ['Stage A', 'Stage B', 'Stage C', 'Stage D', 'enforced profile', 'longRestCleanup',

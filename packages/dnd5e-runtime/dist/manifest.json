@@ -19,21 +19,21 @@
   "moduleId": "arcane-dnd5e-2014-automation",
   "source": {
     "path": "src/automation.js",
-    "bytes": 787629,
-    "sha256": "a92843bd942d0c3ed90f3a8ac827f6a6cf7550638cbeb3169b3ad0be2ccd25b8"
+    "bytes": 791464,
+    "sha256": "27b13a64bb1c1f71684eee48726371921f4d05e38efd053ac56b55b7983e684c"
   },
-  "sourceHash": "a92843bd942d0c3ed90f3a8ac827f6a6cf7550638cbeb3169b3ad0be2ccd25b8",
+  "sourceHash": "27b13a64bb1c1f71684eee48726371921f4d05e38efd053ac56b55b7983e684c",
   "artifact": {
     "path": "dist/dnd5e-runtime.mjs",
-    "bytes": 791441,
-    "sha256": "eacf0612f150659b6cfe090f1c119dff812e1751ef0bcbea4355be2a0d0b50bf"
+    "bytes": 795276,
+    "sha256": "eb9ef8ad74edb79ac618bbe0fb0596cbe16b9a506c79baeb06eeeccb7cee30bb"
   },
-  "buildHash": "eacf0612f150659b6cfe090f1c119dff812e1751ef0bcbea4355be2a0d0b50bf",
+  "buildHash": "eb9ef8ad74edb79ac618bbe0fb0596cbe16b9a506c79baeb06eeeccb7cee30bb",
   "contentPolicy": "runtime-only",
   "contentPolicySummary": "Complete DND5E 2014 runtime mechanics only; no spell descriptions, compendium documents, images, translations or world state.",
   "baseline": {
     "path": "src/source-baseline.json",
-    "sha256": "3f0eb2af084da89a7935fc7c109ad63ede41b7caaa7ad6054d5ae234819f1ac3",
+    "sha256": "ca4b7f4451b664ca997872c4c14aa85eabd83099de9b917b04dd10ba2ce24133",
     "refreshPolicy": "manual-only"
   },
   "provenance": {
@@ -41,7 +41,7 @@
     "upstreamCommit": "f91719cf19cc8208e7568c6d31b1e18c3e43deab",
     "upstreamSourceSha256": "83e5edbe453ea0e8e61e9a95852c2fc8a4ff746c996f93bec7c51f56d509c54d",
     "testedRuntimeOrigin": "Current tested complete VTT runtime copy",
-    "testedRuntimeSha256": "a92843bd942d0c3ed90f3a8ac827f6a6cf7550638cbeb3169b3ad0be2ccd25b8",
+    "testedRuntimeSha256": "27b13a64bb1c1f71684eee48726371921f4d05e38efd053ac56b55b7983e684c",
     "reviewedDifferences": [
       "longRestCleanup compatibility shim",
       "Dread Ambusher effect icon",

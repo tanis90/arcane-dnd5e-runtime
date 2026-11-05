@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sha256": "a92843bd942d0c3ed90f3a8ac827f6a6cf7550638cbeb3169b3ad0be2ccd25b8",
+  "sha256": "27b13a64bb1c1f71684eee48726371921f4d05e38efd053ac56b55b7983e684c",
   "source": {
     "path": "src/automation.js",
     "origin": "Current tested complete VTT runtime copy"
@@ -27,7 +27,7 @@
     },
     {
       "name": "First-party HP pool ownership handshake",
-      "summary": "applyHitPointPoolAllocatorFromUse recognizes the first-party hp-pool-runtime settlement receipt (__mtHpPoolProcessed + a strictly shaped __mtHpPool) on the same Workflow and returns true without a second roll, artifact or chat message. Valid success, explicit failure and explicit empty-target receipts all suppress the runtime allocator; a processed marker with a malformed receipt throws instead of falling back."
+      "summary": "applyHitPointPoolAllocatorFromUse recognizes the first-party hp-pool-runtime settlement receipt (__mtHpPoolProcessed + a strictly shaped __mtHpPool). A successful receipt applies the compiler artifact exactly once to the host's affectedTokens, matching pool.affected tokenIds in order and requiring each token to be a real workflow target with an actor; it never rolls again or posts a pool card. Failed and empty receipts apply no artifact. A malformed or inconsistent receipt throws before any roll, artifact or message."
     },
     {
       "name": "First-party independent-projectile ownership handshake",

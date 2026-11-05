@@ -78,7 +78,7 @@ from a stale container or a spell-only projection. The reviewed record lives in
 `packages/dnd5e-runtime/src/source-baseline.json`:
 
 - Copied source SHA256:
-  `a92843bd942d0c3ed90f3a8ac827f6a6cf7550638cbeb3169b3ad0be2ccd25b8`.
+  `27b13a64bb1c1f71684eee48726371921f4d05e38efd053ac56b55b7983e684c`.
 - Upstream commit:
   `f91719cf19cc8208e7568c6d31b1e18c3e43deab`.
 - Upstream source SHA256:
@@ -96,9 +96,10 @@ The complete source retains these tested differences:
    the upstream game-icons SVG path.
 3. `applyHitPointPoolAllocatorFromUse` recognizes the first-party HP pool
    settlement receipt (`__mtHpPoolProcessed` plus a strictly shaped
-   `__mtHpPool`) and returns without a second roll, artifact or chat message.
-   Success, explicit failure and explicit empty-target receipts are all accepted;
-   a processed marker with a malformed receipt throws instead of falling back.
+   `__mtHpPool`). A successful receipt applies the compiler artifact exactly
+   once to the host's affected tokens without a second roll or pool card;
+   failed and empty receipts apply no artifact. A malformed or inconsistent
+   receipt throws instead of falling back.
 4. `applyIndependentProjectilesFromUse` honors `__mtProjectileOwner` on the real
    `workflowOptions`/usage paths, so the first-party projectile runtime remains
    the only orchestrator for the workflows it creates. The runtime direct path,

@@ -8427,15 +8427,26 @@ async function applyHitPointPoolArtifact(
   return created;
 }
 
-function hostHpPoolSettlementComplete(workflow) {
+function hitPointPoolTokenId(token) {
+  return String(
+    token?.document?.id
+    ?? token?.document?._id
+    ?? token?.id
+    ?? token?._id
+    ?? "",
+  ).trim();
+}
+
+function hostHpPoolSettlementReceipt(workflow) {
   // First-party web/spell-runtime/hp-pool-runtime.mjs owns pool allocation at
   // midi-qol.targetingComplete. It settles the pool on the same Workflow and
   // shrinks workflow.targets before native ApplyDynamicEffects runs. Once the
-  // host marks a Workflow as processed, the receipt is authoritative: a valid
-  // success/failure/empty receipt means this runtime must not roll or apply a
-  // second time, and a malformed receipt must fail closed instead of falling
-  // back to the ordinary allocator.
-  if (workflow?.__mtHpPoolProcessed !== true) return false;
+  // host marks a Workflow as processed, the receipt is authoritative: this
+  // runtime must not roll or post a second pool card. A successful receipt also
+  // names the real affected tokens so this runtime can apply the compiler
+  // artifact, because the placing Activity does not run native effect transfer
+  // for this pool operation. Malformed receipts fail closed before any effect.
+  if (workflow?.__mtHpPoolProcessed !== true) return null;
   const malformed = (reason) => {
     throw new Error(
       "hit-point-pool-allocator-v1 host settlement receipt is malformed: "
@@ -8501,7 +8512,7 @@ function hostHpPoolSettlementComplete(workflow) {
     ) {
       malformed("empty receipt must not carry affected or skipped entries");
     }
-    return true;
+    return { kind: "empty" };
   }
   if (failed) {
     if (hasTotal || hasRemaining) {
@@ -8510,7 +8521,7 @@ function hostHpPoolSettlementComplete(workflow) {
     if (pool.affected.length || settlement.affectedTokens.length) {
       malformed("failed receipt must not carry affected entries");
     }
-    return true;
+    return { kind: "failed" };
   }
   if (!formula) malformed("successful receipt needs a formula");
   if (
@@ -8523,6 +8534,96 @@ function hostHpPoolSettlementComplete(workflow) {
   ) {
     malformed("successful receipt needs non-negative numeric total and remaining");
   }
+  if (pool.affected.length !== settlement.affectedTokens.length) {
+    malformed("affected and affectedTokens lengths differ");
+  }
+  const workflowTargets = Array.from(workflow?.targets ?? [])
+    .filter(Boolean);
+  const workflowTargetIds = new Set(
+    workflowTargets.map(hitPointPoolTokenId).filter(Boolean),
+  );
+  const workflowTargetUuids = new Set(
+    workflowTargets
+      .map(target => String(target?.document?.uuid ?? target?.uuid ?? ""))
+      .filter(Boolean),
+  );
+  const seenTokenIds = new Set();
+  const affectedTargets = [];
+  for (let index = 0; index < pool.affected.length; index += 1) {
+    const entry = pool.affected[index];
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      malformed("affected[" + index + "] is not an object");
+    }
+    const tokenId = String(entry.tokenId ?? "").trim();
+    if (!tokenId) malformed("affected[" + index + "] has no tokenId");
+    if (seenTokenIds.has(tokenId)) {
+      malformed("affected[" + index + "] repeats tokenId " + tokenId);
+    }
+    seenTokenIds.add(tokenId);
+    const token = settlement.affectedTokens[index];
+    const actualTokenId = hitPointPoolTokenId(token);
+    if (!actualTokenId || actualTokenId !== tokenId) {
+      malformed(
+        "affectedTokens[" + index + "] id " + (actualTokenId || "?")
+          + " does not match pool.affected[" + index + "] tokenId " + tokenId,
+      );
+    }
+    const actor = token?.actor ?? token?.document?.actor ?? null;
+    if (!actor || typeof actor !== "object") {
+      malformed("affectedTokens[" + index + "] has no actor");
+    }
+    if (!workflowTargetIds.has(tokenId)) {
+      malformed(
+        "affectedTokens[" + index + "] token " + tokenId
+          + " is not in workflow.targets",
+      );
+    }
+    const tokenUuid = String(token?.document?.uuid ?? token?.uuid ?? "");
+    if (
+      !workflowTargets.includes(token)
+      && (!tokenUuid || !workflowTargetUuids.has(tokenUuid))
+    ) {
+      malformed(
+        "affectedTokens[" + index + "] object is not the workflow target",
+      );
+    }
+    affectedTargets.push({ token, actor });
+  }
+  return { kind: "success", affectedTargets };
+}
+
+async function applyHostHpPoolSettlementArtifacts(
+  item,
+  workflow,
+  receipt,
+  artifactId,
+) {
+  const sourceActor = workflow?.actor ?? item?.actor;
+  if (!sourceActor?.uuid) {
+    throw new Error(
+      "hit-point-pool-allocator-v1 host settlement could not resolve source actor",
+    );
+  }
+  if (!String(item?.uuid ?? "").trim()) {
+    throw new Error(
+      "hit-point-pool-allocator-v1 host settlement could not resolve source item",
+    );
+  }
+  const template = await ownedTemplateDocumentForWorkflow(item, workflow);
+  if (!template) {
+    throw new Error(
+      "hit-point-pool-allocator-v1 host settlement could not resolve its owned measured template",
+    );
+  }
+  for (const target of receipt.affectedTargets) {
+    await applyHitPointPoolArtifact(
+      item,
+      sourceActor,
+      target,
+      artifactId,
+    );
+  }
+  await releaseHitPointPoolTemplateSource(item, sourceActor, template);
   return true;
 }
 
@@ -8548,8 +8649,13 @@ async function applyHitPointPoolAllocatorFromUse(item, usageConfig, workflow) {
     );
   }
   // The first-party host already rolled, allocated and reshaped this Workflow's
-  // targets. Re-rolling here would double both the pool and the applied artifacts.
-  if (hostHpPoolSettlementComplete(workflow)) return true;
+  // targets. A failed/empty receipt has no artifact to apply; a successful
+  // receipt names the exact affected tokens and lets this runtime materialize
+  // the compiler artifact without rolling or posting another pool card.
+  const hostReceipt = hostHpPoolSettlementReceipt(workflow);
+  if (hostReceipt?.kind === "failed" || hostReceipt?.kind === "empty") {
+    return true;
+  }
   const rule = rules[0];
   const operations = (rule.operations ?? []).filter(operationValue =>
     operationValue.type === "allocate-hit-point-pool"
@@ -8580,6 +8686,15 @@ async function applyHitPointPoolAllocatorFromUse(item, usageConfig, workflow) {
   if (workflow.__arcaneHitPointPoolAllocatorRules.has(rule.id)) return true;
   workflow.__arcaneHitPointPoolAllocatorRules.add(rule.id);
   try {
+    if (hostReceipt?.kind === "success") {
+      await applyHostHpPoolSettlementArtifacts(
+        item,
+        workflow,
+        hostReceipt,
+        operationValue.artifactId,
+      );
+      return true;
+    }
     const sourceActor = workflow?.actor ?? item?.actor;
     if (!sourceActor) {
       throw new Error("hit-point-pool-allocator-v1 could not resolve source actor");

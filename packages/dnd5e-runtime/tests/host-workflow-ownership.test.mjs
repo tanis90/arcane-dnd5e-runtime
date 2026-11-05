@@ -54,8 +54,18 @@ function hpPoolItem(actor, artifactId = 'sleep-artifact') {
     flags: {[MODULE_ID]: {compilerArtifactIds: [artifactId]}},
     toObject: () => ({
       name: 'Sleep',
+      statuses: ['unconscious', 'incapacitated'],
       changes: [],
       flags: {[MODULE_ID]: {compilerArtifactIds: [artifactId]}},
+    }),
+  };
+  const decoy = {
+    flags: {[MODULE_ID]: {compilerArtifactIds: ['decoy-artifact']}},
+    toObject: () => ({
+      name: 'Decoy',
+      statuses: ['charmed'],
+      changes: [],
+      flags: {[MODULE_ID]: {compilerArtifactIds: ['decoy-artifact']}},
     }),
   };
   const item = {
@@ -64,7 +74,7 @@ function hpPoolItem(actor, artifactId = 'sleep-artifact') {
     name: 'Sleep',
     type: 'spell',
     actor,
-    effects: [effect],
+    effects: [decoy, effect],
     system: {identifier: 'sleep', level: 1},
     flags: {
       [MODULE_ID]: {
@@ -116,10 +126,21 @@ function installHpPoolHarness() {
   const target = targetToken('target-1', 5);
   const template = {
     uuid: 'Scene.s1.MeasuredTemplate.sleep',
-    flags: {dnd5e: {origin: 'Actor.source.Item.sleep'}},
+    flags: {
+      dnd5e: {
+        origin: 'Actor.source.Item.sleep',
+        dependentOn: 'Actor.source.ActiveEffect.sleep-source',
+      },
+    },
   };
   const {item, activity} = hpPoolItem(actor);
-  const state = {rolls: [], messages: [], effects: 0, templates: 0};
+  const state = {
+    rolls: [],
+    messages: [],
+    effects: 0,
+    effectData: [],
+    templateReleases: 0,
+  };
   class FakeRoll {
     constructor(formula) {
       this.formula = formula;
@@ -130,9 +151,19 @@ function installHpPoolHarness() {
       return this;
     }
   }
-  target.actor.createEmbeddedDocuments = async () => {
+  target.actor.createEmbeddedDocuments = async (_type, documents) => {
     state.effects += 1;
+    state.effectData.push(documents[0]);
     return [{id: 'target-1-effect'}];
+  };
+  const sourceEffect = {
+    documentName: 'ActiveEffect',
+    uuid: 'Actor.source.ActiveEffect.sleep-source',
+    origin: item.uuid,
+    parent: {uuid: actor.uuid},
+    async delete() {
+      state.templateReleases += 1;
+    },
   };
   harness.context.Roll = FakeRoll;
   harness.context.ChatMessage = {
@@ -142,6 +173,9 @@ function installHpPoolHarness() {
     },
     getSpeaker: () => ({}),
   };
+  harness.context.fromUuid = async (uuid) => (
+    uuid === sourceEffect.uuid ? sourceEffect : null
+  );
   harness.context.MidiQOL = {
     computeTargetsFromTemplates: () => [target],
   };
@@ -152,10 +186,14 @@ function installHpPoolHarness() {
     targets: new Set([target]),
     template,
   };
-  return {harness, actor, item, activity, workflow, state};
+  return {harness, actor, item, activity, workflow, target, state};
 }
 
-function hostSettlement(overrides = {}) {
+function hostSettlement({
+  pool = {},
+  affectedTokens = [],
+  skippedTokens = [],
+} = {}) {
   return {
     pool: {
       formula: '5d8',
@@ -164,24 +202,85 @@ function hostSettlement(overrides = {}) {
       castLevel: 1,
       affected: [],
       skipped: [],
-      ...overrides.pool,
+      ...pool,
     },
-    affectedTokens: overrides.affectedTokens ?? [],
-    skippedTokens: overrides.skippedTokens ?? [],
+    affectedTokens,
+    skippedTokens,
   };
 }
 
-test('host HP pool receipt suppresses the runtime second roll, artifacts and message', async () => {
-  const {harness, item, workflow, state} = installHpPoolHarness();
+function hostAffected(token) {
+  const tokenId = String(token?.document?.id ?? token?.id ?? '');
+  return {
+    tokenId,
+    name: token?.name ?? tokenId,
+    hp: Number(token?.actor?.system?.attributes?.hp?.value ?? 0),
+    cost: Number(token?.actor?.system?.attributes?.hp?.value ?? 0),
+  };
+}
+
+test('host HP pool success applies the compiler artifact once without a second roll or pool message', async () => {
+  const {harness, item, workflow, target, state} = installHpPoolHarness();
   workflow.__mtHpPoolProcessed = true;
-  workflow.__mtHpPool = hostSettlement();
+  workflow.__mtHpPool = hostSettlement({
+    pool: { affected: [hostAffected(target)] },
+    affectedTokens: [target],
+  });
 
   assert.equal(await harness.api.applyHitPointPoolAllocatorFromUse(item, {}, workflow), true);
   assert.equal(await harness.api.applyHitPointPoolAllocatorFromUse(item, {}, workflow), true);
 
   assert.deepEqual(state.rolls, []);
-  assert.equal(state.effects, 0);
   assert.deepEqual(state.messages, []);
+  assert.equal(state.effects, 1);
+  assert.equal(state.templateReleases, 1);
+  const created = state.effectData[0];
+  assert.equal(created.name, 'Sleep');
+  assert.deepEqual(created.statuses, ['unconscious', 'incapacitated']);
+  assert.equal(created.flags[MODULE_ID].sourceUuid, 'Actor.source');
+  assert.equal(created.flags[MODULE_ID].targetUuid, 'Actor.target-1');
+  assert.equal(created.flags[MODULE_ID].targetTokenUuid, 'Scene.s1.Token.target-1');
+});
+
+test('host HP pool success with a missing compiler artifact fails closed', async () => {
+  const {harness, item, workflow, target, state} = installHpPoolHarness();
+  item.effects = item.effects.filter(effect =>
+    !effect.flags[MODULE_ID].compilerArtifactIds.includes('sleep-artifact')
+  );
+  workflow.__mtHpPoolProcessed = true;
+  workflow.__mtHpPool = hostSettlement({
+    pool: { affected: [hostAffected(target)] },
+    affectedTokens: [target],
+  });
+
+  await assert.rejects(
+    () => harness.api.applyHitPointPoolAllocatorFromUse(item, {}, workflow),
+    /could not materialize artifact sleep-artifact/,
+  );
+
+  assert.deepEqual(state.rolls, []);
+  assert.deepEqual(state.messages, []);
+  assert.equal(state.effects, 0);
+  assert.equal(state.templateReleases, 0);
+});
+
+test('host HP pool success with no affected targets only releases the template', async () => {
+  const {harness, item, workflow, state} = installHpPoolHarness();
+  workflow.__mtHpPoolProcessed = true;
+  workflow.__mtHpPool = hostSettlement({
+    pool: {
+      remaining: 20,
+      skipped: [{tokenId: 'target-1', name: 'target-1', hp: 20, reason: 'pool'}],
+    },
+    skippedTokens: [workflow.targets.values().next().value],
+  });
+
+  assert.equal(await harness.api.applyHitPointPoolAllocatorFromUse(item, {}, workflow), true);
+
+  assert.deepEqual(state.rolls, []);
+  assert.deepEqual(state.messages, []);
+  assert.equal(state.effects, 0);
+  assert.equal(state.templateReleases, 1);
 });
 
 test('a malformed host receipt is rejected without a second roll, artifact or message', async () => {
@@ -197,6 +296,7 @@ test('a malformed host receipt is rejected without a second roll, artifact or me
   assert.deepEqual(state.rolls, []);
   assert.equal(state.effects, 0);
   assert.deepEqual(state.messages, []);
+  assert.equal(state.templateReleases, 0);
 });
 
 test('a processed workflow without any receipt is rejected instead of re-rolled', async () => {
@@ -211,6 +311,7 @@ test('a processed workflow without any receipt is rejected instead of re-rolled'
   assert.deepEqual(state.rolls, []);
   assert.equal(state.effects, 0);
   assert.deepEqual(state.messages, []);
+  assert.equal(state.templateReleases, 0);
 });
 
 test('a valid first-party failure receipt suppresses the runtime allocator', async () => {
@@ -230,6 +331,7 @@ test('a valid first-party failure receipt suppresses the runtime allocator', asy
   assert.deepEqual(state.rolls, []);
   assert.equal(state.effects, 0);
   assert.deepEqual(state.messages, []);
+  assert.equal(state.templateReleases, 0);
 });
 
 test('a valid first-party empty-target receipt suppresses the runtime allocator', async () => {
@@ -254,6 +356,109 @@ test('a valid first-party empty-target receipt suppresses the runtime allocator'
   assert.deepEqual(state.rolls, []);
   assert.equal(state.effects, 0);
   assert.deepEqual(state.messages, []);
+  assert.equal(state.templateReleases, 0);
+});
+
+test('host affected and affectedTokens length mismatch fails closed', async () => {
+  const {harness, item, workflow, target, state} = installHpPoolHarness();
+  workflow.__mtHpPoolProcessed = true;
+  workflow.__mtHpPool = hostSettlement({
+    pool: { affected: [hostAffected(target)] },
+    affectedTokens: [],
+  });
+
+  await assert.rejects(
+    () => harness.api.applyHitPointPoolAllocatorFromUse(item, {}, workflow),
+    /affected and affectedTokens lengths differ/,
+  );
+
+  assert.deepEqual(state.rolls, []);
+  assert.equal(state.effects, 0);
+  assert.deepEqual(state.messages, []);
+  assert.equal(state.templateReleases, 0);
+});
+
+test('host affectedTokens order/id mismatch fails closed', async () => {
+  const {harness, item, workflow, target, state} = installHpPoolHarness();
+  const other = targetToken('target-2', 5);
+  workflow.__mtHpPoolProcessed = true;
+  workflow.__mtHpPool = hostSettlement({
+    pool: { affected: [hostAffected(target)] },
+    affectedTokens: [other],
+  });
+
+  await assert.rejects(
+    () => harness.api.applyHitPointPoolAllocatorFromUse(item, {}, workflow),
+    /does not match pool\.affected/,
+  );
+
+  assert.deepEqual(state.rolls, []);
+  assert.equal(state.effects, 0);
+  assert.deepEqual(state.messages, []);
+  assert.equal(state.templateReleases, 0);
+});
+
+test('host affectedTokens outside workflow.targets fails closed', async () => {
+  const {harness, item, workflow, target, state} = installHpPoolHarness();
+  const impostor = targetToken('target-1', 5);
+  impostor.document.uuid = 'Scene.s1.Token.impostor';
+  workflow.__mtHpPoolProcessed = true;
+  workflow.__mtHpPool = hostSettlement({
+    pool: { affected: [hostAffected(target)] },
+    affectedTokens: [impostor],
+  });
+
+  await assert.rejects(
+    () => harness.api.applyHitPointPoolAllocatorFromUse(item, {}, workflow),
+    /object is not the workflow target/,
+  );
+
+  assert.deepEqual(state.rolls, []);
+  assert.equal(state.effects, 0);
+  assert.deepEqual(state.messages, []);
+  assert.equal(state.templateReleases, 0);
+});
+
+test('host success without a source actor fails closed', async () => {
+  const {harness, actor, item, workflow, target, state} = installHpPoolHarness();
+  workflow.actor = null;
+  item.actor = null;
+  workflow.__mtHpPoolProcessed = true;
+  workflow.__mtHpPool = hostSettlement({
+    pool: { affected: [hostAffected(target)] },
+    affectedTokens: [target],
+  });
+
+  await assert.rejects(
+    () => harness.api.applyHitPointPoolAllocatorFromUse(item, {}, workflow),
+    /could not resolve source actor/,
+  );
+
+  assert.equal(actor.uuid, 'Actor.source');
+  assert.deepEqual(state.rolls, []);
+  assert.equal(state.effects, 0);
+  assert.deepEqual(state.messages, []);
+  assert.equal(state.templateReleases, 0);
+});
+
+test('host affected token without an actor fails closed', async () => {
+  const {harness, item, workflow, target, state} = installHpPoolHarness();
+  target.actor = null;
+  workflow.__mtHpPoolProcessed = true;
+  workflow.__mtHpPool = hostSettlement({
+    pool: { affected: [{tokenId: 'target-1', name: 'target-1', hp: 5, cost: 5}] },
+    affectedTokens: [target],
+  });
+
+  await assert.rejects(
+    () => harness.api.applyHitPointPoolAllocatorFromUse(item, {}, workflow),
+    /has no actor/,
+  );
+
+  assert.deepEqual(state.rolls, []);
+  assert.equal(state.effects, 0);
+  assert.deepEqual(state.messages, []);
+  assert.equal(state.templateReleases, 0);
 });
 
 test('an unmarked workflow still rolls once and stays idempotent on the same workflow', async () => {
@@ -265,6 +470,7 @@ test('an unmarked workflow still rolls once and stays idempotent on the same wor
   assert.deepEqual(state.rolls, ['5d8']);
   assert.equal(state.effects, 1);
   assert.equal(state.messages.length, 1);
+  assert.equal(state.templateReleases, 1);
 });
 
 test('a host marker on an item without a matching compiler rule is not treated as host-owned', async () => {
