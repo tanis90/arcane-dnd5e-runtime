@@ -141,6 +141,28 @@ paths, credentials, images, compendium/world data and extra files.
 `packages/dnd5e-runtime/src/source-baseline.json` is a manually reviewed full
 runtime source hash. It is never refreshed automatically by CI.
 
+## Owner CI receipt
+
+`.github/workflows/owner-ci.yml` runs on every push, pull request and manual
+dispatch under Node 24. Owner tooling (this workflow source plus `tools/`) and
+the tested source are checked out separately: PRs and pushes test
+`github.sha`, while a manual dispatch accepts a `testedCommit` input (a full
+40-hex sha, defaulting to the pinned release commit) so an older pinned
+commit can be certified after the tooling has merged. Each tree runs its own
+`npm ci`; the tested source then runs `npm run build`, `npm test`,
+`npm run test:compiler:node24` and `npm run pack:check`, and the tooling runs
+`node owner-meta/tools/verify-owner-release.mjs --root <source> ...` as the
+final step. The verifier re-checks the tested commit, the reviewed
+`src/automation.js` hash, the committed `dist/dnd5e-runtime.mjs` bytes and
+hashes, the manifest wiring and a deterministic in-memory rebuild of the
+artifact. Only after every step and the verifier itself have succeeded does it
+write `owner-ci-receipt.json` with `result: "passed"`, the Actions run URL and
+the `testedCommit` / `artifactHash` values a federated frontend manifest binds
+to. The workflow uploads the receipt and the tested dist as run artifacts; it
+never publishes, releases or pushes anything back. Any failing step means no
+receipt exists, and outside Actions the verifier reports `"runUrl": null`, so
+a local run can never be presented as CI evidence.
+
 ## Content policy and provenance
 
 Every published package follows the `runtime-only` content policy: mechanisms,
