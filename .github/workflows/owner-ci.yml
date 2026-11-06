@@ -1,0 +1,102 @@
+name: Owner CI
+
+# Produces the reviewable receipt the federated frontend P1 manifest binds to
+# (ci.result / ci.command / ci.runUrl / ci.binds.commit / ci.binds.artifactHash).
+# Owner tooling (this workflow source plus tools/) and the tested source are
+# checked out separately, so workflow_dispatch can also certify an older pinned
+# commit whose tree predates these tools. It never publishes, releases or pushes
+# anything back, and the receipt is written only by the final step, after every
+# earlier step and the verifier itself have succeeded. runUrl is real only
+# inside Actions; a red run leaves no receipt at all.
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+    inputs:
+      testedCommit:
+        description: Full 40-hex commit of the tested source (defaults to the pinned release commit)
+        required: false
+        default: d51138c65b17b5d527c34eb545ea6c5efce7c286
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: owner-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  owner-ci:
+    runs-on: ubuntu-latest
+    env:
+      OWNER_CI_COMMIT: ${{ inputs.testedCommit || github.sha }}
+      OWNER_CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Checkout owner tooling
+        uses: actions/checkout@v4
+        with:
+          path: owner-meta
+
+      - name: Checkout tested source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.OWNER_CI_COMMIT }}
+          path: source
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: source/package-lock.json
+
+      - name: Install owner tooling dependencies
+        run: npm ci
+        working-directory: owner-meta
+
+      - name: Install tested source dependencies
+        run: npm ci
+        working-directory: source
+
+      - name: Build
+        run: npm run build
+        working-directory: source
+
+      - name: Test
+        run: npm test
+        working-directory: source
+
+      - name: Compiler tests on Node 24
+        run: npm run test:compiler:node24
+        working-directory: source
+
+      - name: Pack check
+        run: npm run pack:check
+        working-directory: source
+
+      - name: Verify owner release and write receipt
+        # Last step: the verifier must pass here or the job fails with no
+        # receipt at all, so result=passed cannot coexist with a red run. It
+        # reads, rebuilds and binds to the tested source checkout only.
+        run: >
+          node owner-meta/tools/verify-owner-release.mjs
+          --root "$GITHUB_WORKSPACE/source"
+          --commit "$OWNER_CI_COMMIT"
+          --run-url "$OWNER_CI_RUN_URL"
+          --receipt "$GITHUB_WORKSPACE/owner-ci-receipt.json"
+
+      - name: Upload receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: owner-ci-receipt
+          path: owner-ci-receipt.json
+          if-no-files-found: error
+
+      - name: Upload tested dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dnd5e-runtime-dist
+          path: source/packages/dnd5e-runtime/dist/
+          if-no-files-found: error
