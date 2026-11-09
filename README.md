@@ -158,10 +158,29 @@ hashes, the manifest wiring and a deterministic in-memory rebuild of the
 artifact. Only after every step and the verifier itself have succeeded does it
 write `owner-ci-receipt.json` with `result: "passed"`, the Actions run URL and
 the `testedCommit` / `artifactHash` values a federated frontend manifest binds
-to. The workflow uploads the receipt and the tested dist as run artifacts; it
-never publishes, releases or pushes anything back. Any failing step means no
-receipt exists, and outside Actions the verifier reports `"runUrl": null`, so
-a local run can never be presented as CI evidence.
+to. The workflow uploads the receipt and the tested dist as run artifacts. Any
+failing step means no receipt exists, and outside Actions the verifier reports
+`"runUrl": null`, so a local run can never be presented as CI evidence.
+
+## SDK release artifact
+
+A second job, `sdk-artifact`, re-checks out the certified commit, rebuilds it,
+requires the committed `dist/` bytes to equal the rebuild, and assembles the
+deterministic SDK distribution artifact with `tools/owner-ci/release.mjs`: four
+members (`dnd5e-runtime.mjs`, `dnd5e-runtime.sdk-manifest.json`,
+`dnd5e-runtime.LICENSE.txt`, `dnd5e-runtime.NOTICE.txt`), store-only, paths
+sorted, fixed 1980-01-01 timestamps, `0644`, plus a manifest and a receipt.
+Every member is compared with the git blob at the released commit, and the zip
+is unpacked again and diffed against the source tree before the files are
+written. `tools/owner-ci/README.md` documents the recipe and the local commands.
+
+`release-publish` turns those three files into the assets of a GitHub Release,
+but only for a `release-*` tag whose commit is an ancestor of `origin/main`
+(D2/D8). It verifies the downloaded bytes against the tag commit, refuses to
+overwrite an existing release, uploads to a draft, re-checks the draft's asset
+names and sizes, and only then publishes. Branch pushes and pull requests upload
+the same three files as private run artifacts (30-day retention) and never
+create a release.
 
 ## Content policy and provenance
 
@@ -191,5 +210,7 @@ combat. VM/build/compiler acceptance is not a claim of real GM/player or real
 Foundry smoke certification. The staged plan is in `docs/evolution-plan.md`; the
 authoring entry point is in `docs/dsl-authoring.md`.
 
-The repository is public, but no npm publication, deployment or release/tag is
-performed by this workspace.
+The repository is public, but no npm publication or deployment is performed by
+this workspace. The only release coordinate is a `release-*` GitHub Release cut
+from `main`: tagging is a deliberate human action, and the owner CI lane then
+attaches the deterministic three-file SDK artifact described above.
