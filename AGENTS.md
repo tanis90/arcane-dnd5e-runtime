@@ -39,6 +39,7 @@
 - 真实 CI receipt 至少绑定完整 commit、`unit`/manifest identity（包版本、`schemaVersion`、`moduleId`、`contentPolicy`）与 artifact（`artifactHash`/`buildHash`）；前端 lock 再聚合 `manifestHash`、`hostApi`、`runtimeSdkApi`，不得只给 `result: "passed"`。
 - release 身份优先 tag，否则完整 40 位 commit；禁止 `main`、`latest`、短 hash。`owner-ci.yml` 的 `testedCommit` 当前只接受完整 40-hex，传 tag 前必须先解析成 commit。
 - 本地或非 Actions 运行只能得到 `runUrl: null`，不得冒充 CI 回执；任一步失败都不得写出 `result: "passed"`。
+- A 类出件坐标是 GitHub Release（D2）：只有自 main 切出的 `release-*` tag 才出件（`git merge-base --is-ancestor` 血统门），分支 push / PR / dispatch 只产出私有 run artifact，不得变成坐标。三件固定 asset（`dnd5e-runtime-sdk.zip` / `-manifest.json` / `-receipt.json`）由 `tools/owner-ci/release.mjs` 从被测 commit 的字节确定性生成，先草稿后发布；同一 release 身份只对应一份字节，禁止覆盖，修复必须出新 tag。消费方第五件 `dnd5e-runtime.manifest.json` 由前端 sync 工具生成，owner 侧只校验其绑定。
 - 不要求后端发版或战役迁移；不把未跑的真实集成 smoke 说成已认证，也不把 VM/compiler 通过说成 live Foundry 认证。
 
 ## 许可、恢复与回滚
@@ -49,7 +50,7 @@
 
 ## 验证入口
 
-- 权威入口：`README.md`、`docs/runtime-baseline.md`、`packages/dnd5e-runtime/dist/manifest.json`、`.github/workflows/owner-ci.yml`、`tools/verify-owner-release.mjs`；不要堆历史 PR 状态。
+- 权威入口：`README.md`、`docs/runtime-baseline.md`、`packages/dnd5e-runtime/dist/manifest.json`、`.github/workflows/owner-ci.yml`、`tools/verify-owner-release.mjs`、`tools/owner-ci/README.md`；不要堆历史 PR 状态。
 - runtime 与 contracts 的 Node floor 是 `>=22.12`；compiler 显式 `>=24 <25`，用 `npm run test:compiler:node24` 验证；不要把 runtime/contracts 的 floor 统一抬到 24。
 - 已核实的本地命令：
 
@@ -60,6 +61,9 @@ npm test
 npm run test:compiler:node24
 npm run pack:check
 node tools/verify-owner-release.mjs --root . --commit "$(git rev-parse HEAD)" --receipt owner-ci-receipt.json
+node tools/owner-ci/release.mjs inventory --root .
+node tools/owner-ci/release.mjs assemble --root . --out-dir <dir-outside-repo>
+node tools/owner-ci/release.mjs verify --artifact <dir>/dnd5e-runtime-sdk.zip --manifest <dir>/dnd5e-runtime-sdk-manifest.json --receipt <dir>/dnd5e-runtime-sdk-receipt.json --root .
 ```
 
-- `git diff --check` 是发布卫生检查，不是 runtime 认证；`owner-ci.yml` 双 checkout（tooling `owner-meta` + tested `source`）各自 `npm ci`，source 依次 build/test/test:compiler:node24/pack:check，最后由 owner-meta 的 verifier 绑定 `source` 与完整 40-hex commit 并上传 receipt/tested dist。
+- `git diff --check` 是发布卫生检查，不是 runtime 认证；`owner-ci.yml` 双 checkout（tooling `owner-meta` + tested `source`）各自 `npm ci`，source 依次 build/test/test:compiler:node24/pack:check，最后由 owner-meta 的 verifier 绑定 `source` 与完整 40-hex commit 并上传 receipt/tested dist。`sdk-artifact` 再按同一 commit 重建并出三件 SDK 产物（rebuild 与已提交 dist 逐字节一致才通过），`release-publish` 只在 `release-*` tag 上运行。

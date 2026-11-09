@@ -1,13 +1,35 @@
 name: Owner CI
 
 # Produces the reviewable receipt the federated frontend P1 manifest binds to
-# (ci.result / ci.command / ci.runUrl / ci.binds.commit / ci.binds.artifactHash).
-# Owner tooling (this workflow source plus tools/) and the tested source are
-# checked out separately, so workflow_dispatch can also certify an older pinned
-# commit whose tree predates these tools. It never publishes, releases or pushes
-# anything back, and the receipt is written only by the final step, after every
-# earlier step and the verifier itself have succeeded. runUrl is real only
-# inside Actions; a red run leaves no receipt at all.
+# (ci.result / ci.command / ci.runUrl / ci.binds.commit / ci.binds.artifactHash),
+# and, on a `release-*` tag cut from main, the SDK distribution zip itself.
+#
+# Three jobs, in order:
+#   owner-ci     — owner tooling (this workflow source plus tools/) and the tested
+#                  source are checked out separately, so workflow_dispatch can also
+#                  certify an older pinned commit whose tree predates these tools.
+#                  The tested tree runs npm ci/build/test/test:compiler:node24/
+#                  pack:check, then the verifier binds the complete 40-hex commit,
+#                  the reviewed source hash, the committed dist bytes and an
+#                  in-memory rebuild, and only then writes the receipt.
+#   sdk-artifact — re-checks out the exact certified commit, rebuilds, proves the
+#                  committed dist bytes equal the rebuild, and assembles the
+#                  deterministic SDK distribution zip + manifest + receipt
+#                  (tools/owner-ci/release.mjs). Uploaded as a private run artifact
+#                  with 30-day retention.
+#   release-publish — D2/D8: the A-class coordinate is a GitHub Release, and only a
+#                  `release-*` tag whose commit is on the origin/main ancestry may
+#                  create it. Downloads the same three files, verifies them against
+#                  the tag commit, and publishes them as fixed-name assets.
+#
+# Workflow-level permissions stay `contents: read`. The only write action in the
+# whole workflow is release-publish, which asks for job-level `contents: write`
+# and uses the GITHUB_TOKEN to create a release. Existing releases are never
+# overwritten (one release identity = one set of bytes; fixes need a new tag),
+# and the three assets are uploaded to a draft first and re-checked before the
+# draft is published. Branch pushes and pull requests therefore can never turn
+# into a coordinate. runUrl is real only inside Actions; a red run leaves no
+# receipt at all.
 
 on:
   pull_request:
@@ -25,11 +47,15 @@ permissions:
 
 concurrency:
   group: owner-ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Tag runs may be publishing a release; a newer run must not cancel one that is
+  # half-way through uploading assets. Branch/PR runs keep the old behaviour.
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   owner-ci:
     runs-on: ubuntu-latest
+    outputs:
+      testedCommit: ${{ steps.commit.outputs.testedCommit }}
     env:
       OWNER_CI_COMMIT: ${{ inputs.testedCommit || github.sha }}
       OWNER_CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -45,6 +71,12 @@ jobs:
           ref: ${{ env.OWNER_CI_COMMIT }}
           path: source
           fetch-depth: 1
+
+      # The certified commit is whatever the tested checkout resolved to, never a
+      # bare ref name: an annotated tag's github.sha may be the tag object id.
+      - name: Resolve tested commit
+        id: commit
+        run: echo "testedCommit=$(git -C "$GITHUB_WORKSPACE/source" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v4
         with:
@@ -100,3 +132,316 @@ jobs:
           name: dnd5e-runtime-dist
           path: source/packages/dnd5e-runtime/dist/
           if-no-files-found: error
+
+  sdk-artifact:
+    name: Assemble SDK distribution artifact
+    runs-on: ubuntu-latest
+    needs: owner-ci
+    steps:
+      # Tooling comes from the workflow source, so a pinned historical commit can
+      # be packaged even though its tree has no tools/owner-ci.
+      - name: Checkout owner tooling
+        uses: actions/checkout@v4
+        with:
+          path: owner-meta
+          sparse-checkout: |
+            tools/owner-ci
+          sparse-checkout-cone-mode: false
+
+      - name: Checkout tested source (exact certified commit)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.owner-ci.outputs.testedCommit }}
+          path: source
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: source/package-lock.json
+
+      - name: Install tested source dependencies
+        run: npm ci
+        working-directory: source
+
+      - name: Rebuild
+        run: npm run build
+        working-directory: source
+
+      # Determinism gate: the committed dist bytes must be exactly the rebuild of
+      # this commit, otherwise the packaged artifact would not be reproducible.
+      - name: Committed dist equals rebuild
+        run: git -C "$GITHUB_WORKSPACE/source" diff --exit-code -- packages
+
+      - name: Assemble and self-verify the deterministic SDK artifact
+        run: |
+          node "$GITHUB_WORKSPACE/owner-meta/tools/owner-ci/release.mjs" assemble \
+            --root "$GITHUB_WORKSPACE/source" \
+            --out-dir "$RUNNER_TEMP/sdk-artifact" \
+            --commit "${{ needs.owner-ci.outputs.testedCommit }}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --command "npm ci" \
+            --command "npm run build" \
+            --command "git diff --exit-code -- packages"
+
+      - name: Re-verify zip, manifest, receipt and source tree
+        run: |
+          node "$GITHUB_WORKSPACE/owner-meta/tools/owner-ci/release.mjs" verify \
+            --artifact "$RUNNER_TEMP/sdk-artifact/dnd5e-runtime-sdk.zip" \
+            --manifest "$RUNNER_TEMP/sdk-artifact/dnd5e-runtime-sdk-manifest.json" \
+            --receipt "$RUNNER_TEMP/sdk-artifact/dnd5e-runtime-sdk-receipt.json" \
+            --root "$GITHUB_WORKSPACE/source" \
+            --expect-head "${{ needs.owner-ci.outputs.testedCommit }}"
+
+      - name: Upload SDK distribution artifact (private, retention 30d)
+        uses: actions/upload-artifact@v4
+        with:
+          name: dnd5e-runtime-sdk-artifact
+          path: |
+            ${{ runner.temp }}/sdk-artifact/dnd5e-runtime-sdk.zip
+            ${{ runner.temp }}/sdk-artifact/dnd5e-runtime-sdk-manifest.json
+            ${{ runner.temp }}/sdk-artifact/dnd5e-runtime-sdk-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
+  # D2: the A-class distribution coordinate is a GitHub Release (tag addressed,
+  # pulled from GitHub itself, no OSS credentials). D8: the coordinate semantics
+  # are "a tag on main", so this job only accepts a `release-*` tag whose commit
+  # is an ancestor of origin/main; a branch push or PR never reaches it.
+  #
+  # The released bytes are the ones the sdk-artifact job certified: the three
+  # files are downloaded, re-verified against the tag's checkout, and additionally
+  # required to have been built from the tag commit itself. This job is the only
+  # writer in the workflow; an existing release is never overwritten, the assets
+  # go up as a draft, and the draft is re-checked (names + sizes) before publish.
+  release-publish:
+    name: Publish SDK artifact to GitHub Release (tag @ main only)
+    runs-on: ubuntu-latest
+    needs: [owner-ci, sdk-artifact]
+    if: >-
+      github.event_name == 'push' && github.ref_type == 'tag'
+      && startsWith(github.ref_name, 'release-') && needs.sdk-artifact.result == 'success'
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      # Full history: the D8 gate needs origin/main to run merge-base against.
+      # Credentials are not persisted; the release write only uses GH_TOKEN.
+      - name: Checkout owner tooling with full history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          path: owner-meta
+          sparse-checkout: |
+            tools/owner-ci
+          sparse-checkout-cone-mode: false
+          fetch-depth: 0
+          persist-credentials: false
+
+      # D8 gate (fail-closed): tag shape + the tag commit's main ancestry.
+      # `git rev-parse <ref>^{commit}` is used instead of github.sha because an
+      # annotated tag's sha may be the tag object, not the commit.
+      - name: D8 gate (release-* tag whose commit is on main ancestry)
+        id: gate
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            echo "::error::release-publish 只允许 tag 触发（当前 ref_type=${GITHUB_REF_TYPE}）；分支产物不得变成坐标"
+            exit 1
+          fi
+          case "${GITHUB_REF_NAME}" in
+            release-*) : ;;
+            *)
+              echo "::error::tag ${GITHUB_REF_NAME} 不匹配 release-*，不出件（D8）"
+              exit 1
+              ;;
+          esac
+          TAG_COMMIT="$(git -C "$GITHUB_WORKSPACE/owner-meta" rev-parse --verify "${GITHUB_REF}^{commit}")"
+          if ! git -C "$GITHUB_WORKSPACE/owner-meta" rev-parse --verify --quiet refs/remotes/origin/main >/dev/null; then
+            echo "::error::checkout 里没有 origin/main，无法做 D8 血统校验"
+            exit 1
+          fi
+          MAIN_TIP="$(git -C "$GITHUB_WORKSPACE/owner-meta" rev-parse refs/remotes/origin/main)"
+          if ! git -C "$GITHUB_WORKSPACE/owner-meta" merge-base --is-ancestor "$TAG_COMMIT" refs/remotes/origin/main; then
+            echo "::error::tag ${GITHUB_REF_NAME} 的 commit ${TAG_COMMIT} 不在 origin/main 祖先线上（D8：坐标只认自 main 切出的 tag；main tip=${MAIN_TIP}）"
+            exit 1
+          fi
+          {
+            echo "tagName=${GITHUB_REF_NAME}"
+            echo "tagCommit=${TAG_COMMIT}"
+            echo "mainTip=${MAIN_TIP}"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### D8 血统校验"
+            echo ""
+            echo "- tag: \`${GITHUB_REF_NAME}\`"
+            echo "- tag commit: \`${TAG_COMMIT}\`"
+            echo "- origin/main tip: \`${MAIN_TIP}\`"
+            echo "- \`git merge-base --is-ancestor\` = 通过"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout tested source (exact tag commit)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.gate.outputs.tagCommit }}
+          path: source
+          persist-credentials: false
+
+      - name: Download the three SDK artifact files
+        uses: actions/download-artifact@v4
+        with:
+          name: dnd5e-runtime-sdk-artifact
+          path: ${{ runner.temp }}/release-artifact
+
+      # Re-verify before publishing: zip <-> manifest <-> receipt <-> source tree,
+      # plus the requirement that the artifact was built from the tag commit.
+      - name: Verify released bytes belong to the tag commit
+        run: |
+          set -euo pipefail
+          ART="$RUNNER_TEMP/release-artifact"
+          node "$GITHUB_WORKSPACE/owner-meta/tools/owner-ci/release.mjs" verify \
+            --artifact "$ART/dnd5e-runtime-sdk.zip" \
+            --manifest "$ART/dnd5e-runtime-sdk-manifest.json" \
+            --receipt "$ART/dnd5e-runtime-sdk-receipt.json" \
+            --root "$GITHUB_WORKSPACE/source" \
+            --expect-head "${{ steps.gate.outputs.tagCommit }}"
+          MANIFEST_COMMIT="$(node -p "require('$ART/dnd5e-runtime-sdk-manifest.json').commit")"
+          if [ "$MANIFEST_COMMIT" != "${{ steps.gate.outputs.tagCommit }}" ]; then
+            echo "::error::出件 commit ${MANIFEST_COMMIT} 与 tag commit ${{ steps.gate.outputs.tagCommit }} 不一致，拒绝发布"
+            exit 1
+          fi
+
+      - name: Release notes (run URL + three asset sha256 + identity)
+        working-directory: ${{ runner.temp }}/release-artifact
+        run: |
+          set -euo pipefail
+          MANIFEST="dnd5e-runtime-sdk-manifest.json"
+          RECEIPT="dnd5e-runtime-sdk-receipt.json"
+          ZIP_SHA="$(sha256sum dnd5e-runtime-sdk.zip | awk '{print $1}')"
+          MANIFEST_SHA="$(sha256sum "$MANIFEST" | awk '{print $1}')"
+          RECEIPT_SHA="$(sha256sum "$RECEIPT" | awk '{print $1}')"
+          ZIP_SIZE="$(wc -c < dnd5e-runtime-sdk.zip | tr -d ' ')"
+          PACKAGE="$(node -p "require('./$MANIFEST').unit.package")"
+          VERSION="$(node -p "require('./$MANIFEST').unit.version")"
+          MODULE_ID="$(node -p "require('./$MANIFEST').unit.moduleId")"
+          BUILD_HASH="$(node -p "require('./$MANIFEST').unit.artifact.sha256")"
+          SOURCE_HASH="$(node -p "require('./$MANIFEST').unit.source.sha256")"
+          SET_HASH="$(node -p "require('./$MANIFEST').setHash")"
+          HASH_NAMESPACE="$(node -p "require('./$MANIFEST').hashNamespace")"
+          FILE_COUNT="$(node -p "require('./$MANIFEST').artifact.fileCount")"
+          RECIPE="$(node -p "require('./$MANIFEST').artifact.zipRecipe")"
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          {
+            echo "# ${GITHUB_REF_NAME} · ${PACKAGE}@${VERSION} SDK distribution"
+            echo ""
+            echo "由 owner CI 从 git + 已审查的 dist 字节确定性组装（recipe \`${RECIPE}\`）。"
+            echo ""
+            echo "- run: ${RUN_URL}"
+            echo "- tag commit: \`${{ steps.gate.outputs.tagCommit }}\`（自 main 切出，D8 血统已校验）"
+            echo "- origin/main tip: \`${{ steps.gate.outputs.mainTip }}\`"
+            echo "- moduleId: \`${MODULE_ID}\`"
+            echo ""
+            echo "| asset | sha256 | size |"
+            echo "| --- | --- | --- |"
+            echo "| dnd5e-runtime-sdk.zip | \`${ZIP_SHA}\` | ${ZIP_SIZE} B (${FILE_COUNT} files) |"
+            echo "| dnd5e-runtime-sdk-manifest.json | \`${MANIFEST_SHA}\` | - |"
+            echo "| dnd5e-runtime-sdk-receipt.json | \`${RECEIPT_SHA}\` | - |"
+            echo ""
+            echo "| binding | value |"
+            echo "| --- | --- |"
+            echo "| commit | \`${{ steps.gate.outputs.tagCommit }}\` |"
+            echo "| buildHash | \`${BUILD_HASH}\` |"
+            echo "| sourceHash | \`${SOURCE_HASH}\` |"
+            echo "| setHash (\`${HASH_NAMESPACE}\`) | \`${SET_HASH}\` |"
+            echo ""
+            echo "zip 根目录即前端分发目录 \`web/runtime-sdk/dnd5e-runtime\`，四个成员按名落位；"
+            echo "第五件 \`dnd5e-runtime.manifest.json\` 由采纳方 \`tools/sync-dnd5e-runtime.mjs\` 生成。"
+            echo "采纳侧请按 (tag, zip sha256, commit, setHash) 绑定；同一 release 身份只对应这份字节，"
+            echo "修复必须出新 tag。"
+          } > "$RUNNER_TEMP/release-notes.md"
+          cat "$RUNNER_TEMP/release-notes.md" >> "$GITHUB_STEP_SUMMARY"
+
+      # One release identity = one set of bytes:
+      #   - an existing published release fails the job (never overwrite in place);
+      #   - a leftover draft of the same tag (an interrupted earlier run, invisible
+      #     to users) is discarded and rebuilt from this run's certified bytes.
+      # Only an explicit 404 counts as "no release"; any other API failure is fatal.
+      - name: Guard existing release (published = hard fail, leftover draft = discard)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.gate.outputs.tagName }}"
+          set +e
+          API_OUT="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" 2>&1)"
+          API_STATUS=$?
+          set -e
+          if [ "$API_STATUS" -ne 0 ]; then
+            if printf '%s' "$API_OUT" | grep -qi "HTTP 404"; then
+              echo "no existing release for ${TAG}"
+              exit 0
+            fi
+            echo "::error::查询 ${TAG} 的 release 失败（非 404），拒绝继续：${API_OUT}"
+            exit 1
+          fi
+          IS_DRAFT="$(printf '%s' "$API_OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(String(JSON.parse(s).draft)))')"
+          if [ "$IS_DRAFT" = "true" ]; then
+            echo "::warning::丢弃同 tag 的遗留草稿 ${TAG}（未发布、用户不可见），按本次出证字节重建"
+            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes
+          else
+            echo "::error::release ${TAG} 已发布：同一 release 身份只对应一份字节，禁止覆盖；修复请出新 tag"
+            exit 1
+          fi
+
+      # Draft first: users cannot see a release that is missing an asset or failed
+      # mid-upload. Only a fully verified draft is published.
+      - name: Create draft GitHub release with the three fixed-name assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: ${{ runner.temp }}/release-artifact
+        run: |
+          set -euo pipefail
+          gh release create "${{ steps.gate.outputs.tagName }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --draft \
+            --title "DND5E runtime SDK ${{ steps.gate.outputs.tagName }}" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            dnd5e-runtime-sdk.zip dnd5e-runtime-sdk-manifest.json dnd5e-runtime-sdk-receipt.json
+
+      # Re-check the draft's asset names and sizes before publishing; sha256 is in
+      # the notes and the bytes come from the files verified above, so this guards
+      # against a truncated or missing upload.
+      - name: Verify draft assets (names + sizes) before publishing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: ${{ runner.temp }}/release-artifact
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.gate.outputs.tagName }}"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | sort > "$RUNNER_TEMP/assets.txt"
+          printf 'dnd5e-runtime-sdk-manifest.json\ndnd5e-runtime-sdk-receipt.json\ndnd5e-runtime-sdk.zip\n' > "$RUNNER_TEMP/expected.txt"
+          if ! diff -u "$RUNNER_TEMP/expected.txt" "$RUNNER_TEMP/assets.txt"; then
+            echo "::error::草稿 release 的 asset 名单与固定三件不符"
+            exit 1
+          fi
+          for f in dnd5e-runtime-sdk.zip dnd5e-runtime-sdk-manifest.json dnd5e-runtime-sdk-receipt.json; do
+            GOT="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+              --jq ".assets[] | select(.name == \"$f\") | .size")"
+            WANT="$(wc -c < "$f" | tr -d ' ')"
+            if [ "$GOT" != "$WANT" ]; then
+              echo "::error::asset $f 大小不符：release=$GOT 本地=$WANT"
+              exit 1
+            fi
+          done
+
+      - name: Publish the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release edit "${{ steps.gate.outputs.tagName }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false
+          echo "published: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${{ steps.gate.outputs.tagName }}" >> "$GITHUB_STEP_SUMMARY"

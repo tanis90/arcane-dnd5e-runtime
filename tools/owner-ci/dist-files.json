@@ -1,0 +1,37 @@
+{
+  "schema": "arcane-dnd5e-runtime-sdk-dist-files/1",
+  "distributionRoot": "web/runtime-sdk/dnd5e-runtime",
+  "members": [
+    {
+      "path": "dnd5e-runtime.mjs",
+      "source": "packages/dnd5e-runtime/dist/dnd5e-runtime.mjs",
+      "role": "artifact"
+    },
+    {
+      "path": "dnd5e-runtime.LICENSE.txt",
+      "source": "packages/dnd5e-runtime/LICENSE",
+      "role": "license"
+    },
+    {
+      "path": "dnd5e-runtime.NOTICE.txt",
+      "source": "packages/dnd5e-runtime/NOTICE",
+      "role": "notice"
+    },
+    {
+      "path": "dnd5e-runtime.sdk-manifest.json",
+      "source": "packages/dnd5e-runtime/dist/manifest.json",
+      "role": "sdk-manifest"
+    }
+  ],
+  "consumerGenerated": {
+    "path": "dnd5e-runtime.manifest.json",
+    "owner": "mt-foundry-compat",
+    "generatedBy": "tools/sync-dnd5e-runtime.mjs",
+    "binds": [
+      "commit",
+      "sourceHash",
+      "buildHash",
+      "sdkManifest.sha256"
+    ]
+  }
+}
