@@ -57,7 +57,6 @@ jobs:
     outputs:
       testedCommit: ${{ steps.commit.outputs.testedCommit }}
     env:
-      OWNER_CI_COMMIT: ${{ inputs.testedCommit || github.sha }}
       OWNER_CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - name: Checkout owner tooling
@@ -68,15 +67,25 @@ jobs:
       - name: Checkout tested source
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.OWNER_CI_COMMIT }}
+          # A tag ref is used as-is so git peels it to the commit; github.sha of an
+          # annotated tag may be the tag object id instead.
+          ref: ${{ inputs.testedCommit || (github.ref_type == 'tag' && github.ref || github.sha) }}
           path: source
           fetch-depth: 1
 
-      # The certified commit is whatever the tested checkout resolved to, never a
-      # bare ref name: an annotated tag's github.sha may be the tag object id.
+      # The certified commit is whatever the tested checkout resolved to, so a tag
+      # (annotated or not) certifies the commit it points at. A dispatch input is
+      # still enforced: the checkout must land exactly on it.
       - name: Resolve tested commit
         id: commit
-        run: echo "testedCommit=$(git -C "$GITHUB_WORKSPACE/source" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          set -euo pipefail
+          RESOLVED="$(git -C "$GITHUB_WORKSPACE/source" rev-parse HEAD)"
+          if [ -n "${{ inputs.testedCommit }}" ] && [ "$RESOLVED" != "${{ inputs.testedCommit }}" ]; then
+            echo "::error::checkout 解析到 ${RESOLVED}，与 inputs.testedCommit ${{ inputs.testedCommit }} 不一致"
+            exit 1
+          fi
+          echo "testedCommit=${RESOLVED}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v4
         with:
@@ -111,11 +120,12 @@ jobs:
       - name: Verify owner release and write receipt
         # Last step: the verifier must pass here or the job fails with no
         # receipt at all, so result=passed cannot coexist with a red run. It
-        # reads, rebuilds and binds to the tested source checkout only.
+        # reads, rebuilds and binds to the tested source checkout only, and the
+        # expected commit is the one the checkout resolved to.
         run: >
           node owner-meta/tools/verify-owner-release.mjs
           --root "$GITHUB_WORKSPACE/source"
-          --commit "$OWNER_CI_COMMIT"
+          --commit "${{ steps.commit.outputs.testedCommit }}"
           --run-url "$OWNER_CI_RUN_URL"
           --receipt "$GITHUB_WORKSPACE/owner-ci-receipt.json"
 
