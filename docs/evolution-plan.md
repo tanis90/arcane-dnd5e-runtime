@@ -25,7 +25,7 @@ not a claim that either host has switched.
 
 Deliverables:
 
-- `@arcanedesk/dnd5e-runtime@0.1.0`, schema `1`, Node `>=22.12`.
+- `@arcanedesk/dnd5e-runtime@0.1.1`, schema `1`, Node `>=22.12`.
 - One full browser artifact, `dist/dnd5e-runtime.mjs`, with factory
   `initializeDnd5eRuntime`. All class, ancestry, UI and spell hooks/API entries
   are retained; there is no spell-only projection.
@@ -37,7 +37,8 @@ Deliverables:
 - Reviewed full source baseline and deterministic `dist/` build.
 - Real Node `vm` tests comparing the full initializer's 54 hook registrations and
   163 API keys exactly with the current complete runtime, plus self-identity,
-  idempotency, rollback, ready API and long-rest behavior.
+  idempotency, rollback, ready API, setup-time status registration and
+  long-rest behavior.
 - Real compiler tests for DSL → deterministic plan → `runtimePlan` → runtime
   availability, plus explicit negative cases.
 - Release-content checks over the repository and every package tarball: file

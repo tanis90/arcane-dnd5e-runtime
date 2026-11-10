@@ -1,4 +1,4 @@
-export const SDK_VERSION = '0.1.0';
+export const SDK_VERSION = '0.1.1';
 export const RUNTIME_SCHEMA_VERSION = 1;
 export const CONTENT_POLICY = 'runtime-only';
 export const DEFAULT_MODULE_ID = 'arcane-dnd5e-2014-automation';

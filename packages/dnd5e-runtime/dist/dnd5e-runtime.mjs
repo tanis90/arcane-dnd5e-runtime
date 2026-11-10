@@ -63,6 +63,8 @@ const FONT_OF_INSPIRATION_IDENTIFIER = "font-of-inspiration";
 const SONG_OF_REST_IDENTIFIER = "song-of-rest";
 const COUNTERCHARM_IDENTIFIER = "countercharm";
 const BARDIC_INSPIRATION_FLAG = "bardicInspiration";
+const BARDIC_INSPIRATION_STATUS_ID = "arcane-bardic-inspiration";
+const BARDIC_INSPIRATION_STATUS_ICON = "modules/arcane-dnd5e-2014-automation/assets/game-icons/delapouite/drum.svg";
 const COUNTERCHARM_FLAG = "countercharm";
 const BG3_SHORT_RESTS_USED_FLAG = "bg3ShortRestsUsed";
 const TWILIGHT_SANCTUARY_IDENTIFIER = "channel-divinity-twilight-sanctuary";
@@ -15590,7 +15592,7 @@ async function grantBardicInspiration(sourceIdentifier, targetIdentifier, config
     system: {},
     changes: [],
     duration: { seconds: 600 },
-    statuses: [],
+    statuses: [BARDIC_INSPIRATION_STATUS_ID],
     flags: {
       [MODULE_ID]: {
         [BARDIC_INSPIRATION_FLAG]: true,
@@ -15996,7 +15998,7 @@ async function applyDreadAmbusherTurnStart(combat, changed) {
       dae: { specialDuration: ["turnEnd", "combatEnd"], stackable: "noneName", showIcon: true },
       [MODULE_ID]: { dreadAmbusherRoundOne: true },
     },
-    img: "modules/arcane-dnd5e-2014-automation/Nicons/Ability_Ambush.png",
+    img: "modules/arcane-dnd5e-2014-automation/assets/game-icons/lorc/shadow-follower.svg",
     type: "base",
     system: {},
   }]);
@@ -21251,6 +21253,18 @@ function patchMidiInstantTemplateRemoval() {
   workflowPrototype.WorkflowState_Cleanup = arcaneWorkflowStateCleanup;
   return true;
 }
+
+Hooks.once("setup", () => {
+  // dnd5e replaces CONFIG.statusEffects in its own setup hook, so the custom
+  // status must be registered at setup, not init.
+  if (!(CONFIG.statusEffects ?? []).some(status => status.id === BARDIC_INSPIRATION_STATUS_ID)) {
+    CONFIG.statusEffects.push({
+      id: BARDIC_INSPIRATION_STATUS_ID,
+      name: "Bardic Inspiration",
+      img: BARDIC_INSPIRATION_STATUS_ICON,
+    });
+  }
+});
 
 Hooks.once("ready", () => {
   patchMidiPersistentTemplateCleanupIsolation();
