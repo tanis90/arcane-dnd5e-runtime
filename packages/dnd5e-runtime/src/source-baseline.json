@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sha256": "27b13a64bb1c1f71684eee48726371921f4d05e38efd053ac56b55b7983e684c",
+  "sha256": "581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d",
   "source": {
     "path": "src/automation.js",
     "origin": "Current tested complete VTT runtime copy"
@@ -22,8 +22,12 @@
       "summary": "cleanupReversibleHitPointCapacity accepts an options object and skips the second current-hit-point adjustment when the host deletes a registered reversible-capacity effect with {longRestCleanup: true}; rebalance and ordinary expiry paths are unchanged."
     },
     {
+      "name": "Bardic Inspiration visibility status",
+      "summary": "Granted Bardic Inspiration effects carry the arcane-bardic-inspiration status, and Hooks.once('setup') registers the matching CONFIG.statusEffects entry with the module drum.svg icon after dnd5e resets the status list. The effect and its consumption stay owned by the runtime; the status only drives token visibility."
+    },
+    {
       "name": "Dread Ambusher effect icon",
-      "summary": "The Dread Ambusher effect keeps the tested host icon path modules/arcane-dnd5e-2014-automation/Nicons/Ability_Ambush.png instead of the upstream game-icons shadow-follower.svg path."
+      "summary": "The Dread Ambusher effect uses the module game-icons shadow-follower.svg path instead of the legacy Nicons/Ability_Ambush.png path."
     },
     {
       "name": "First-party HP pool ownership handshake",

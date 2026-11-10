@@ -1,6 +1,6 @@
 {
   "name": "@arcanedesk/dnd5e-runtime",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "schemaVersion": 1,
   "runtimeKind": "full",
   "factoryName": "initializeDnd5eRuntime",
@@ -19,21 +19,21 @@
   "moduleId": "arcane-dnd5e-2014-automation",
   "source": {
     "path": "src/automation.js",
-    "bytes": 791464,
-    "sha256": "27b13a64bb1c1f71684eee48726371921f4d05e38efd053ac56b55b7983e684c"
+    "bytes": 792113,
+    "sha256": "581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d"
   },
-  "sourceHash": "27b13a64bb1c1f71684eee48726371921f4d05e38efd053ac56b55b7983e684c",
+  "sourceHash": "581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d",
   "artifact": {
     "path": "dist/dnd5e-runtime.mjs",
-    "bytes": 795276,
-    "sha256": "eb9ef8ad74edb79ac618bbe0fb0596cbe16b9a506c79baeb06eeeccb7cee30bb"
+    "bytes": 795925,
+    "sha256": "1b15319f8484b37d4c43998a3e38c15fb1c724fcb3a2c473ac11dcdfe7ddc864"
   },
-  "buildHash": "eb9ef8ad74edb79ac618bbe0fb0596cbe16b9a506c79baeb06eeeccb7cee30bb",
+  "buildHash": "1b15319f8484b37d4c43998a3e38c15fb1c724fcb3a2c473ac11dcdfe7ddc864",
   "contentPolicy": "runtime-only",
   "contentPolicySummary": "Complete DND5E 2014 runtime mechanics only; no spell descriptions, compendium documents, images, translations or world state.",
   "baseline": {
     "path": "src/source-baseline.json",
-    "sha256": "ca4b7f4451b664ca997872c4c14aa85eabd83099de9b917b04dd10ba2ce24133",
+    "sha256": "397b7c7a572501c6f1724f8446875d8707390337d260871c34c3b451c8a7a859",
     "refreshPolicy": "manual-only"
   },
   "provenance": {
@@ -41,9 +41,10 @@
     "upstreamCommit": "f91719cf19cc8208e7568c6d31b1e18c3e43deab",
     "upstreamSourceSha256": "83e5edbe453ea0e8e61e9a95852c2fc8a4ff746c996f93bec7c51f56d509c54d",
     "testedRuntimeOrigin": "Current tested complete VTT runtime copy",
-    "testedRuntimeSha256": "27b13a64bb1c1f71684eee48726371921f4d05e38efd053ac56b55b7983e684c",
+    "testedRuntimeSha256": "581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d",
     "reviewedDifferences": [
       "longRestCleanup compatibility shim",
+      "Bardic Inspiration visibility status",
       "Dread Ambusher effect icon",
       "First-party HP pool ownership handshake",
       "First-party independent-projectile ownership handshake"

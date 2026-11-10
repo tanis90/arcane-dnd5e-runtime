@@ -24,7 +24,8 @@ test('full build is deterministic and preserves the reviewed raw source', async 
   assert.equal(built.report.adapters.length, 44);
   assert(built.source.includes('export function initializeDnd5eRuntime'));
   assert(built.source.includes('options?.longRestCleanup !== true'));
-  assert(built.source.includes('modules/arcane-dnd5e-2014-automation/Nicons/Ability_Ambush.png'));
+  assert(built.source.includes('modules/arcane-dnd5e-2014-automation/assets/game-icons/lorc/shadow-follower.svg'));
+  assert(!built.source.includes('Nicons/Ability_Ambush.png'));
   assert(built.source.includes('applyDeclaredDivineSmite'));
   assert(built.source.includes('applyRangerTceOptionalFeaturesPatch'));
   assert(built.source.includes('hideCurrentFthCharacterCreatorControl'));

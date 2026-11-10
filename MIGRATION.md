@@ -3,7 +3,7 @@
 ## New identity
 
 The public source now ships one complete DND5E 2014 runtime as
-`@arcanedesk/dnd5e-runtime@0.1.0` at
+`@arcanedesk/dnd5e-runtime@0.1.1` at
 <https://github.com/tanis90/arcane-dnd5e-runtime>. The earlier spell-only SDK and
 its projection artifact are retired; there is no compatibility spell-only mode
 and no second browser runtime. The previous repository URL redirects to the new
@@ -21,7 +21,7 @@ API entries into the full initializer. `createDnd5eRuntime(options)` returns:
 ```js
 const sdk = {
   manifest: {
-    version: '0.1.0',
+    version: '0.1.1',
     schemaVersion: 1,
     runtimeKind: 'full',
     factoryName: 'initializeDnd5eRuntime',
@@ -78,7 +78,7 @@ from a stale container or a spell-only projection. The reviewed record lives in
 `packages/dnd5e-runtime/src/source-baseline.json`:
 
 - Copied source SHA256:
-  `27b13a64bb1c1f71684eee48726371921f4d05e38efd053ac56b55b7983e684c`.
+  `581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d`.
 - Upstream commit:
   `f91719cf19cc8208e7568c6d31b1e18c3e43deab`.
 - Upstream source SHA256:
@@ -91,16 +91,23 @@ The complete source retains these tested differences:
    hit-point-capacity effect with `{longRestCleanup: true}`. Native long rest has
    already cleared temporary maximum HP and restored the base maximum; rebalance
    and ordinary expiry/deletion paths are unchanged.
-2. The Dread Ambusher effect keeps the tested host icon path
-   `modules/arcane-dnd5e-2014-automation/Nicons/Ability_Ambush.png` instead of
-   the upstream game-icons SVG path.
-3. `applyHitPointPoolAllocatorFromUse` recognizes the first-party HP pool
+2. The Dread Ambusher effect uses the module's
+   `modules/arcane-dnd5e-2014-automation/assets/game-icons/lorc/shadow-follower.svg`
+   image instead of the legacy `Nicons/Ability_Ambush.png` path.
+3. Granted Bardic Inspiration effects carry the
+   `arcane-bardic-inspiration` status, and `Hooks.once('setup')` registers the
+   matching `CONFIG.statusEffects` entry with the module's
+   `assets/game-icons/delapouite/drum.svg` icon. Registration runs at setup
+   because dnd5e replaces the status list in its own setup hook. The effect
+   remains owned and consumed by the runtime; the status only drives token
+   visibility.
+4. `applyHitPointPoolAllocatorFromUse` recognizes the first-party HP pool
    settlement receipt (`__mtHpPoolProcessed` plus a strictly shaped
    `__mtHpPool`). A successful receipt applies the compiler artifact exactly
    once to the host's affected tokens without a second roll or pool card;
    failed and empty receipts apply no artifact. A malformed or inconsistent
    receipt throws instead of falling back.
-4. `applyIndependentProjectilesFromUse` honors `__mtProjectileOwner` on the real
+5. `applyIndependentProjectilesFromUse` honors `__mtProjectileOwner` on the real
    `workflowOptions`/usage paths, so the first-party projectile runtime remains
    the only orchestrator for the workflows it creates. The runtime direct path,
    child guard and receipts are unchanged.

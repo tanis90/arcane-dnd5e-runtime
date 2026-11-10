@@ -1,6 +1,6 @@
 # `@arcanedesk/dnd5e-runtime`
 
-Complete DND5E 2014 automation runtime, version `0.1.0`, runtime schema `1`,
+Complete DND5E 2014 automation runtime, version `0.1.1`, runtime schema `1`,
 Node `>=22.12`. This is the only runtime artifact: there is no spell-only
 projection or second rules implementation.
 

@@ -7,7 +7,7 @@ spell-only projection and it does not ship a second rules implementation.
 
 Repository: <https://github.com/tanis90/arcane-dnd5e-runtime>
 
-Current releases: runtime `@arcanedesk/dnd5e-runtime@0.1.0` (schema `1`, Node
+Current releases: runtime `@arcanedesk/dnd5e-runtime@0.1.1` (schema `1`, Node
 `>=22.12`), contracts `0.1.0`, compiler `0.9.0` (Node `>=24 <25`). The
 compiler's higher Node floor is declared only on that package; the browser/runtime
 floor is not silently raised.
@@ -194,12 +194,13 @@ here; callers pass their own acceptance source.
 - Upstream public source: `tanis90/arcanedesk-fvtt-mods`
   at `f91719cf19cc8208e7568c6d31b1e18c3e43deab`.
 - Runtime source baseline: SHA256
-  `27b13a64bb1c1f71684eee48726371921f4d05e38efd053ac56b55b7983e684c`.
+  `581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d`.
 - The upstream runtime file at that commit has SHA256
   `83e5edbe453ea0e8e61e9a95852c2fc8a4ff746c996f93bec7c51f56d509c54d`.
 - The complete source retains the `longRestCleanup` reversible-hit-point
-  compatibility shim and the Dread Ambusher icon path. These are part of the
-  full runtime baseline, not a projection exception.
+  compatibility shim, the first-party HP-pool/projectile handshakes, the
+  Bardic Inspiration visibility status and the Dread Ambusher game-icons path.
+  These are part of the full runtime baseline, not a projection exception.
 
 ## Scope and limitations
 
