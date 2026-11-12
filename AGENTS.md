@@ -37,9 +37,9 @@
 
 - owner 提供真实 initializer/API/hook/DSL/compiler 的独立安装、构建、测试与 owner 回执证据；至少覆盖 54 hook registrations、163 API keys、确定性 build、rollback、legacy ownership、compiler DSL → runtimePlan → availability。
 - 真实 CI receipt 至少绑定完整 commit、`unit`/manifest identity（包版本、`schemaVersion`、`moduleId`、`contentPolicy`）与 artifact（`artifactHash`/`buildHash`）；前端 lock 再聚合 `manifestHash`、`hostApi`、`runtimeSdkApi`，不得只给 `result: "passed"`。
-- release 身份优先 tag，否则完整 40 位 commit；禁止 `main`、`latest`、短 hash。`owner-ci.yml` 的 `testedCommit` 当前只接受完整 40-hex，传 tag 前必须先解析成 commit。
+- release 身份：正式 A 类出件必须是 `release.tag`（自受保护 main 切出的 `release-*` tag）；完整 40 位 commit 只作证据/诊断与 CI 内部绑定，**不是**前端正式消费坐标，也不得替代 `release.tag`。禁止 `main`、`latest`、短 hash。`owner-ci.yml` 的 `testedCommit` 当前只接受完整 40-hex，传 tag 前必须先解析成 commit。
 - 本地或非 Actions 运行只能得到 `runUrl: null`，不得冒充 CI 回执；任一步失败都不得写出 `result: "passed"`。
-- A 类出件坐标是 GitHub Release（D2）：只有自 main 切出的 `release-*` tag 才出件（`git merge-base --is-ancestor` 血统门），分支 push / PR / dispatch 只产出私有 run artifact，不得变成坐标。三件固定 asset（`dnd5e-runtime-sdk.zip` / `-manifest.json` / `-receipt.json`）由 `tools/owner-ci/release.mjs` 从被测 commit 的字节确定性生成，先草稿后发布；同一 release 身份只对应一份字节，禁止覆盖，修复必须出新 tag。消费方第五件 `dnd5e-runtime.manifest.json` 由前端 sync 工具生成，owner 侧只校验其绑定。
+- A 类出件坐标是 GitHub Release（D2）：默认分支必须是 `main` 且 `main` 受保护（PR + required owner CI checks；禁直推/force-push/删除）；保护未启用或 tag 不在 main 祖先线时不得出件。只有自 main 切出的 `release-*` tag 才出件（`git merge-base --is-ancestor` 血统门），分支 push / PR / dispatch 只产出私有 run artifact，不得变成坐标。三件固定 asset（`dnd5e-runtime-sdk.zip` / `-manifest.json` / `-receipt.json`）由 `tools/owner-ci/release.mjs` 从被测 commit 的字节确定性生成，先草稿后发布；同一 release 身份只对应一份字节，禁止覆盖，修复必须出新 tag。消费方第五件 `dnd5e-runtime.manifest.json` 由前端 sync 工具生成，owner 侧只校验其绑定。receipt 是旁路证据：前端采纳时校验，但只上传报告，不回写 manifest、不改变发布身份，也不驱动前端回写。
 - 不要求后端发版或战役迁移；不把未跑的真实集成 smoke 说成已认证，也不把 VM/compiler 通过说成 live Foundry 认证。
 
 ## 许可、恢复与回滚
