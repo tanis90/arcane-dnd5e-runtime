@@ -37,6 +37,27 @@ export const ARCANE_DND5E_2014_RUNTIME_PROFILE = Object.freeze({
   }),
 });
 
+// 2024 内容线运行在与 2014 相同的系统与 Foundry 供给（midi-qol/DAE/AA）上；
+// 差异只在内容（ruleset 标识与法术语义），故 profile 与 2014 同形、id/ruleset 不同。
+// 引自 auto2024 M1.1（docs/design/auto2024-m1-spell-audit.md）。
+export const ARCANE_DND5E_2024_RUNTIME_PROFILE = Object.freeze({
+  id: "arcane-dnd5e-2024",
+  version: SPELL_AUTOMATION_RUNTIME_PROFILE_VERSION,
+  ruleset: "2024",
+  system: ARCANE_DND5E_2014_RUNTIME_PROFILE.system,
+  providers: ARCANE_DND5E_2014_RUNTIME_PROFILE.providers,
+  expressions: ARCANE_DND5E_2014_RUNTIME_PROFILE.expressions,
+  itemDefaults: ARCANE_DND5E_2014_RUNTIME_PROFILE.itemDefaults,
+  activityDefaults: DEFAULT_ACTIVITY_MIDI_POLICY,
+  effectDefaults: ARCANE_DND5E_2014_RUNTIME_PROFILE.effectDefaults,
+});
+
+function runtimeProfileBase(ruleset) {
+  if (ruleset === undefined || ruleset === "2014") return ARCANE_DND5E_2014_RUNTIME_PROFILE;
+  if (ruleset === "2024") return ARCANE_DND5E_2024_RUNTIME_PROFILE;
+  throw new Error(`runtimeProfile.ruleset is unsupported: ${String(ruleset)}`);
+}
+
 function assertKnownKeys(value, allowed, path) {
   if (value === undefined) return;
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -108,31 +129,32 @@ export function resolveSpellAutomationRuntimeProfile(profile = {}) {
     "runtimeProfile.activityDefaults",
   );
   assertKnownKeys(profile.effectDefaults, ["reapply"], "runtimeProfile.effectDefaults");
+  const base = runtimeProfileBase(profile.ruleset);
   const resolved = {
-    ...ARCANE_DND5E_2014_RUNTIME_PROFILE,
+    ...base,
     ...profile,
     system: {
-      ...ARCANE_DND5E_2014_RUNTIME_PROFILE.system,
+      ...base.system,
       ...(profile.system ?? {}),
     },
     providers: {
-      ...ARCANE_DND5E_2014_RUNTIME_PROFILE.providers,
+      ...base.providers,
       ...(profile.providers ?? {}),
     },
     expressions: {
-      ...ARCANE_DND5E_2014_RUNTIME_PROFILE.expressions,
+      ...base.expressions,
       ...(profile.expressions ?? {}),
     },
     itemDefaults: {
-      ...ARCANE_DND5E_2014_RUNTIME_PROFILE.itemDefaults,
+      ...base.itemDefaults,
       ...(profile.itemDefaults ?? {}),
     },
     activityDefaults: {
-      ...ARCANE_DND5E_2014_RUNTIME_PROFILE.activityDefaults,
+      ...base.activityDefaults,
       ...(profile.activityDefaults ?? {}),
     },
     effectDefaults: {
-      ...ARCANE_DND5E_2014_RUNTIME_PROFILE.effectDefaults,
+      ...base.effectDefaults,
       ...(profile.effectDefaults ?? {}),
     },
   };
@@ -142,13 +164,12 @@ export function resolveSpellAutomationRuntimeProfile(profile = {}) {
     );
   }
   if (
-    resolved.id !== ARCANE_DND5E_2014_RUNTIME_PROFILE.id
-    || resolved.ruleset !== "2014"
-    || resolved.system.id !== "dnd5e"
+    resolved.system.id !== "dnd5e"
     || resolved.system.majorVersion !== 5
+    || resolved.id !== runtimeProfileBase(resolved.ruleset).id
   ) {
     throw new Error(
-      "Runtime profile target must remain arcane-dnd5e-2014 / dnd5e 5.x / 2014 rules",
+      "Runtime profile target must remain arcane-dnd5e-2014/2024 / dnd5e 5.x / id 与 ruleset 配对一致",
     );
   }
   assertFixedObject(

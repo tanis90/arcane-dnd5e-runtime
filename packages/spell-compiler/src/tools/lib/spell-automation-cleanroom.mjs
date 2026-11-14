@@ -1,5 +1,6 @@
 import {
   ARCANE_DND5E_2014_RUNTIME_PROFILE,
+  ARCANE_DND5E_2024_RUNTIME_PROFILE,
   resolveSpellAutomationRuntimeProfile,
 } from "./spell-automation-runtime-profile.mjs";
 
@@ -15,7 +16,7 @@ const CONTENT_FIELDS = Object.freeze([
 ]);
 const CONTENT_FIELD_SET = new Set(CONTENT_FIELDS);
 const MODULE_ID = "arcane-dnd5e-2014-automation";
-const RULESETS = new Set(["2014"]);
+const RULESETS = new Set(["2014", "2024"]);
 const SCHOOLS = new Set(["abj", "con", "div", "enc", "evo", "ill", "nec", "trs"]);
 const ABILITY_IDS = new Set(["str", "dex", "con", "int", "wis", "cha"]);
 const SKILL_IDS = new Set([
@@ -5791,8 +5792,11 @@ export function cleanRoomSemanticSource(definition) {
 }
 
 export function cleanRoomRuntimeProfile(profile = {}) {
+  const base = profile.ruleset === "2024"
+    ? ARCANE_DND5E_2024_RUNTIME_PROFILE
+    : ARCANE_DND5E_2014_RUNTIME_PROFILE;
   return resolveSpellAutomationRuntimeProfile({
-    ...ARCANE_DND5E_2014_RUNTIME_PROFILE,
+    ...base,
     ...profile,
   });
 }
