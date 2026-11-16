@@ -22,6 +22,12 @@ export function createFullHost({
   const once = register(true);
   const off = (_name, id) => hooks.delete(id);
   const legacyModule = {active: legacyActive, api: legacyActive ? {original: true} : undefined};
+  const CONFIG = {
+    statusEffects: [],
+    specialStatusEffects: {},
+    time: {roundTime: 6},
+    DND5E: {actorSizes: {}},
+  };
   const modules = new Map([
     [LEGACY_MODULE_ID, legacyModule],
     [moduleId, moduleId === LEGACY_MODULE_ID ? legacyModule : {active: true}],
@@ -53,6 +59,7 @@ export function createFullHost({
     game,
     canvas,
     ui,
+    CONFIG,
     document: {querySelector: () => null},
     foundry: {applications: {instances: new Map()}},
     console: {
@@ -68,9 +75,18 @@ export function createFullHost({
   });
   context.ArcaneDnd5e2014SpellScripts = priorScripts;
 
+  const runHooks = name => {
+    for (const [id, hook] of [...hooks]) {
+      if (hook.name !== name) continue;
+      hooks.delete(id);
+      hook.callback();
+    }
+  };
+
   return {
     context,
     game,
+    CONFIG,
     hooks,
     warnings,
     priorScripts,
@@ -89,12 +105,12 @@ export function createFullHost({
       const factory = this.evaluateFull(source);
       return factory({moduleId});
     },
+    triggerSetup() {
+      runHooks('setup');
+    },
     triggerReady() {
-      for (const [id, hook] of [...hooks]) {
-        if (hook.name !== 'ready') continue;
-        hooks.delete(id);
-        hook.callback();
-      }
+      runHooks('setup');
+      runHooks('ready');
     },
     hookNames() {
       return [...hooks.values()].map(hook => hook.name).sort();

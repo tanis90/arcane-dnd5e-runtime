@@ -38,7 +38,7 @@ test('createDnd5eRuntime exposes the full manifest and initializer without touch
   assert.equal(globalThis.game, undefined);
   const sdk = await createDnd5eRuntime();
   assert.equal(globalThis.game, undefined);
-  assert.equal(SDK_VERSION, '0.1.0');
+  assert.equal(SDK_VERSION, '0.1.1');
   assert.equal(packageJson.version, SDK_VERSION);
   assert.equal(packageJson.name, '@arcanedesk/dnd5e-runtime');
   assert.equal(SDK_ENGINES.node, '>=22.12');

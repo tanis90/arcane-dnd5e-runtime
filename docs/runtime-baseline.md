@@ -13,7 +13,12 @@ The canonical machine-readable baseline is
 - 48 unique hook names
 - 163 API keys
 - source SHA256:
-  `874c0249322163d2cd2583efd9b1866cc714eb6147eac411f0a2a49847b5df65`
+  `581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d`
+
+The 54-registration baseline is the persistent post-ready set. The browser
+runtime also registers one one-shot `setup` callback that adds the Bardic
+Inspiration status; it is consumed before the snapshot and is not counted as a
+55th persistent hook.
 
 The VM test executes the raw current runtime and the generated initializer and
 compares both complete sorted lists. No projection is applied.
@@ -22,7 +27,7 @@ compares both complete sorted lists. No projection is applied.
 
 `packages/dnd5e-runtime/dist/manifest.json` exposes:
 
-- `name` and `version`: package identity (`0.1.0` for this build)
+- `name` and `version`: package identity (`0.1.1` for this build)
 - `schemaVersion`: `1`
 - `runtimeKind`: `full`
 - `factoryName`: `initializeDnd5eRuntime`

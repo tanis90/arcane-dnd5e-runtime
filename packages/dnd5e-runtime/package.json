@@ -1,6 +1,6 @@
 {
   "name": "@arcanedesk/dnd5e-runtime",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "license": "Apache-2.0",
   "description": "Complete DND5E 2014 automation runtime SDK with a locked browser initializer",

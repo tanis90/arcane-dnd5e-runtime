@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sha256": "874c0249322163d2cd2583efd9b1866cc714eb6147eac411f0a2a49847b5df65",
+  "sha256": "581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d",
   "source": {
     "path": "src/automation.js",
     "origin": "Current tested complete VTT runtime copy"
@@ -12,7 +12,7 @@
   },
   "review": {
     "status": "manually-reviewed",
-    "reviewedOn": "2026-11-02",
+    "reviewedOn": "2026-11-06",
     "refreshPolicy": "manual-only",
     "note": "Never refresh this hash automatically in CI. This is the complete runtime baseline; it is wrapped as a full initializer without hook or API projection."
   },
@@ -22,8 +22,20 @@
       "summary": "cleanupReversibleHitPointCapacity accepts an options object and skips the second current-hit-point adjustment when the host deletes a registered reversible-capacity effect with {longRestCleanup: true}; rebalance and ordinary expiry paths are unchanged."
     },
     {
+      "name": "Bardic Inspiration visibility status",
+      "summary": "Granted Bardic Inspiration effects carry the arcane-bardic-inspiration status, and Hooks.once('setup') registers the matching CONFIG.statusEffects entry with the module drum.svg icon after dnd5e resets the status list. The effect and its consumption stay owned by the runtime; the status only drives token visibility."
+    },
+    {
       "name": "Dread Ambusher effect icon",
-      "summary": "The Dread Ambusher effect keeps the tested host icon path modules/arcane-dnd5e-2014-automation/Nicons/Ability_Ambush.png instead of the upstream game-icons shadow-follower.svg path."
+      "summary": "The Dread Ambusher effect uses the module game-icons shadow-follower.svg path instead of the legacy Nicons/Ability_Ambush.png path."
+    },
+    {
+      "name": "First-party HP pool ownership handshake",
+      "summary": "applyHitPointPoolAllocatorFromUse recognizes the first-party hp-pool-runtime settlement receipt (__mtHpPoolProcessed + a strictly shaped __mtHpPool). A successful receipt applies the compiler artifact exactly once to the host's affectedTokens, matching pool.affected tokenIds in order and requiring each token to be a real workflow target with an actor; it never rolls again or posts a pool card. Failed and empty receipts apply no artifact. A malformed or inconsistent receipt throws before any roll, artifact or message."
+    },
+    {
+      "name": "First-party independent-projectile ownership handshake",
+      "summary": "applyIndependentProjectilesFromUse skips its own projectile chain only when the real workflowOptions (or usage midiOptions) carries __mtProjectileOwner, which first-party projectileCastUsage sets on the parent and every child. The runtime direct path, its child guard and receipts are unchanged."
     }
   ]
 }

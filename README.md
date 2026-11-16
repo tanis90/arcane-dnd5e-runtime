@@ -7,7 +7,7 @@ spell-only projection and it does not ship a second rules implementation.
 
 Repository: <https://github.com/tanis90/arcane-dnd5e-runtime>
 
-Current releases: runtime `@arcanedesk/dnd5e-runtime@0.1.0` (schema `1`, Node
+Current releases: runtime `@arcanedesk/dnd5e-runtime@0.1.1` (schema `1`, Node
 `>=22.12`), contracts `0.1.0`, compiler `0.9.0` (Node `>=24 <25`). The
 compiler's higher Node floor is declared only on that package; the browser/runtime
 floor is not silently raised.
@@ -141,6 +141,47 @@ paths, credentials, images, compendium/world data and extra files.
 `packages/dnd5e-runtime/src/source-baseline.json` is a manually reviewed full
 runtime source hash. It is never refreshed automatically by CI.
 
+## Owner CI receipt
+
+`.github/workflows/owner-ci.yml` runs on every push, pull request and manual
+dispatch under Node 24. Owner tooling (this workflow source plus `tools/`) and
+the tested source are checked out separately: PRs and pushes test
+`github.sha`, while a manual dispatch accepts a `testedCommit` input (a full
+40-hex sha, defaulting to the pinned release commit) so an older pinned
+commit can be certified after the tooling has merged. Each tree runs its own
+`npm ci`; the tested source then runs `npm run build`, `npm test`,
+`npm run test:compiler:node24` and `npm run pack:check`, and the tooling runs
+`node owner-meta/tools/verify-owner-release.mjs --root <source> ...` as the
+final step. The verifier re-checks the tested commit, the reviewed
+`src/automation.js` hash, the committed `dist/dnd5e-runtime.mjs` bytes and
+hashes, the manifest wiring and a deterministic in-memory rebuild of the
+artifact. Only after every step and the verifier itself have succeeded does it
+write `owner-ci-receipt.json` with `result: "passed"`, the Actions run URL and
+the `testedCommit` / `artifactHash` values a federated frontend manifest binds
+to. The workflow uploads the receipt and the tested dist as run artifacts. Any
+failing step means no receipt exists, and outside Actions the verifier reports
+`"runUrl": null`, so a local run can never be presented as CI evidence.
+
+## SDK release artifact
+
+A second job, `sdk-artifact`, re-checks out the certified commit, rebuilds it,
+requires the committed `dist/` bytes to equal the rebuild, and assembles the
+deterministic SDK distribution artifact with `tools/owner-ci/release.mjs`: four
+members (`dnd5e-runtime.mjs`, `dnd5e-runtime.sdk-manifest.json`,
+`dnd5e-runtime.LICENSE.txt`, `dnd5e-runtime.NOTICE.txt`), store-only, paths
+sorted, fixed 1980-01-01 timestamps, `0644`, plus a manifest and a receipt.
+Every member is compared with the git blob at the released commit, and the zip
+is unpacked again and diffed against the source tree before the files are
+written. `tools/owner-ci/README.md` documents the recipe and the local commands.
+
+`release-publish` turns those three files into the assets of a GitHub Release,
+but only for a `release-*` tag whose commit is an ancestor of `origin/main`
+(D2/D8). It verifies the downloaded bytes against the tag commit, refuses to
+overwrite an existing release, uploads to a draft, re-checks the draft's asset
+names and sizes, and only then publishes. Branch pushes and pull requests upload
+the same three files as private run artifacts (30-day retention) and never
+create a release.
+
 ## Content policy and provenance
 
 Every published package follows the `runtime-only` content policy: mechanisms,
@@ -153,12 +194,13 @@ here; callers pass their own acceptance source.
 - Upstream public source: `tanis90/arcanedesk-fvtt-mods`
   at `f91719cf19cc8208e7568c6d31b1e18c3e43deab`.
 - Runtime source baseline: SHA256
-  `874c0249322163d2cd2583efd9b1866cc714eb6147eac411f0a2a49847b5df65`.
+  `581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d`.
 - The upstream runtime file at that commit has SHA256
   `83e5edbe453ea0e8e61e9a95852c2fc8a4ff746c996f93bec7c51f56d509c54d`.
 - The complete source retains the `longRestCleanup` reversible-hit-point
-  compatibility shim and the Dread Ambusher icon path. These are part of the
-  full runtime baseline, not a projection exception.
+  compatibility shim, the first-party HP-pool/projectile handshakes, the
+  Bardic Inspiration visibility status and the Dread Ambusher game-icons path.
+  These are part of the full runtime baseline, not a projection exception.
 
 ## Scope and limitations
 
@@ -169,5 +211,7 @@ combat. VM/build/compiler acceptance is not a claim of real GM/player or real
 Foundry smoke certification. The staged plan is in `docs/evolution-plan.md`; the
 authoring entry point is in `docs/dsl-authoring.md`.
 
-The repository is public, but no npm publication, deployment or release/tag is
-performed by this workspace.
+The repository is public, but no npm publication or deployment is performed by
+this workspace. The only release coordinate is a `release-*` GitHub Release cut
+from `main`: tagging is a deliberate human action, and the owner CI lane then
+attaches the deterministic three-file SDK artifact described above.

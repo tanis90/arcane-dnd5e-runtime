@@ -39,6 +39,8 @@ const FONT_OF_INSPIRATION_IDENTIFIER = "font-of-inspiration";
 const SONG_OF_REST_IDENTIFIER = "song-of-rest";
 const COUNTERCHARM_IDENTIFIER = "countercharm";
 const BARDIC_INSPIRATION_FLAG = "bardicInspiration";
+const BARDIC_INSPIRATION_STATUS_ID = "arcane-bardic-inspiration";
+const BARDIC_INSPIRATION_STATUS_ICON = "modules/arcane-dnd5e-2014-automation/assets/game-icons/delapouite/drum.svg";
 const COUNTERCHARM_FLAG = "countercharm";
 const BG3_SHORT_RESTS_USED_FLAG = "bg3ShortRestsUsed";
 const TWILIGHT_SANCTUARY_IDENTIFIER = "channel-divinity-twilight-sanctuary";
@@ -929,7 +931,8 @@ function nativeSummonOwnedTokens(predicate = () => true) {
 }
 
 function nativeSummonTokenIsLive(token) {
-  const hp = Number(token?.actor?.system?.attributes?.hp?.value);
+  if (!token?.actor) return false;
+  const hp = Number(token.actor.system?.attributes?.hp?.value);
   if (Number.isFinite(hp) && hp <= 0) return false;
   const statuses = token?.actor?.statuses instanceof Set
     ? token.actor.statuses
@@ -1029,11 +1032,22 @@ function prepareNativeSummonUse(activity, usageConfig = {}) {
     const liveChildren = nativeSummonOwnedTokens((provenance, token) =>
       provenance.parentTokenUuid === sourceToken.uuid
         && provenance.rootConcentrationEffectUuid === inheritedRootEffect.uuid
+        && provenance.artifactId === contract.marker.artifactId
+        && provenance.sourceItemUuid === activity.item.uuid
+        && String(provenance.sourceActivityId ?? "") === String(activity.id ?? "")
         && nativeSummonTokenIsLive(token)
     );
     if (liveChildren.length) {
+      const activityName = String(activity?.name ?? activity?.item?.name ?? "").trim()
+        || "This activity";
+      const profile = Array.from(activity?.profiles ?? []).find(candidate =>
+        String(candidate?._id ?? "") === contract.nativeProfileId
+      );
+      const profileName = String(profile?.name ?? contract.marker.profileId ?? "").trim()
+        || "summon";
       const error = new Error(
-        "Fallen Lover cannot summon another Wood Woad while its current Woad is alive",
+        activityName + " cannot summon another " + profileName
+        + " while its current " + profileName + " is alive",
       );
       error.arcaneNativeSummonRejectionCode = "ACTION_BLOCKED";
       throw error;
@@ -1063,9 +1077,6 @@ function prepareNativeSummonUse(activity, usageConfig = {}) {
       ? foundry.utils.deepClone(sourceProvenance)
       : null,
     inheritedRootEffectUuid: inheritedRootEffect?.uuid ?? null,
-    controlExpiresWorldTime: contract.marker.control
-      ? Number(game.time?.worldTime ?? 0) + Number(contract.marker.control.durationSeconds)
-      : null,
     preparedCount: 0,
     postSummonSeen: false,
     postSummonTokenUuids: [],
@@ -1157,9 +1168,6 @@ function nativeSummonPreparedProvenance(record, memberIndex) {
       ? record.inheritedRootEffectUuid
       : null,
     controlContractId: marker.control?.contractId ?? null,
-    controlExpiresWorldTime: marker.control
-      ? record.controlExpiresWorldTime
-      : null,
     lifecyclePolicy: marker.cleanup,
     lifecycleEffectUuid: null,
     controlEffectUuid: null,
@@ -1711,22 +1719,28 @@ function nativeSummonUntrackDependent(dependents, effectUuid, token) {
 
 function nativeSummonControlEffectContract(effect) {
   const value = effect?.flags?.[MODULE_ID]?.nativeSummonControl;
+  const keys = value && typeof value === "object" && !Array.isArray(value)
+    ? Object.keys(value).sort()
+    : null;
+  const legacyKeys = [
+    "artifactId",
+    "contractId",
+    "controllerActorUuid",
+    "expiresWorldTime",
+    "lastInvocationId",
+    "memberIndex",
+    "requestId",
+    "sourceItemUuid",
+    "tokenUuid",
+    "version",
+  ];
+  const currentKeys = legacyKeys.filter(key => key !== "expiresWorldTime");
   if (
-    !value
-    || typeof value !== "object"
-    || Array.isArray(value)
-    || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify([
-      "artifactId",
-      "contractId",
-      "controllerActorUuid",
-      "expiresWorldTime",
-      "lastInvocationId",
-      "memberIndex",
-      "requestId",
-      "sourceItemUuid",
-      "tokenUuid",
-      "version",
-    ])
+    !keys
+    || (
+      JSON.stringify(keys) !== JSON.stringify(currentKeys)
+      && JSON.stringify(keys) !== JSON.stringify(legacyKeys)
+    )
     || Number(value.version) !== NATIVE_SUMMON_CONTROL_VERSION
     || !String(value.contractId ?? "").trim()
     || !String(value.controllerActorUuid ?? "").trim()
@@ -1737,8 +1751,6 @@ function nativeSummonControlEffectContract(effect) {
     || !Number.isInteger(Number(value.memberIndex))
     || Number(value.memberIndex) < 0
     || !String(value.tokenUuid ?? "").trim()
-    || !Number.isFinite(Number(value.expiresWorldTime))
-    || Number(value.expiresWorldTime) <= 0
   ) return null;
   return value;
 }
@@ -1834,10 +1846,7 @@ async function nativeSummonCreateControlEffects(record, tokens) {
       transfer: false,
       disabled: false,
       changes: [],
-      duration: {
-        seconds: Number(control.durationSeconds),
-        startTime: Number(game.time?.worldTime ?? 0),
-      },
+      duration: {},
       statuses: [],
       flags: {
         [MODULE_ID]: {
@@ -1850,7 +1859,6 @@ async function nativeSummonCreateControlEffects(record, tokens) {
             requestId: record.requestId,
             memberIndex,
             tokenUuid: token.uuid,
-            expiresWorldTime: record.controlExpiresWorldTime,
             lastInvocationId: record.requestId,
           },
         },
@@ -1868,13 +1876,11 @@ async function nativeSummonCreateControlEffects(record, tokens) {
       !contract
       || effect.parent?.uuid !== token.actor.uuid
       || contract.tokenUuid !== token.uuid
-      || Number(contract.expiresWorldTime) !== Number(record.controlExpiresWorldTime)
     ) {
       throw new Error("native summon control effect failed exact materialization");
     }
     await nativeSummonWriteFinalProvenance(token, {
       controlEffectUuid: effect.uuid,
-      controlExpiresWorldTime: record.controlExpiresWorldTime,
     });
     effectUuids.push(effect.uuid);
   }
@@ -1959,7 +1965,6 @@ async function nativeSummonBindLifecycle(record, tokens) {
       mode: "control-duration-retain-entity",
       effectUuid: null,
       effectUuids,
-      expiresWorldTime: record.controlExpiresWorldTime,
     };
   }
   if (record.contract.marker.cleanup === "long-rest-or-defeat-or-dismiss") {
@@ -2418,7 +2423,6 @@ function activeNativeSummonControlEffect(actor, expected) {
       && contract.sourceItemUuid === expected.sourceItemUuid
       && contract.artifactId === expected.artifactId
       && contract.tokenUuid === expected.tokenUuid
-      && Number(contract.expiresWorldTime) > Number(game.time?.worldTime ?? 0)
     );
   });
   return matches.length === 1 ? matches[0] : null;
@@ -2518,7 +2522,7 @@ function guardNativeSummonControlAction(actor, item, activity, workflow, usageCo
     });
     if (!effect) {
       return nativeSummonControlPreflightBlock(
-        "A Reassert Control target has no exact, unexpired Arcane control effect.",
+        "A Reassert Control target has no exact active Arcane control effect.",
       );
     }
     members.push({
@@ -2527,9 +2531,6 @@ function guardNativeSummonControlAction(actor, item, activity, workflow, usageCo
       effectUuid: effect.uuid,
       requestId: provenance.requestId,
       memberIndex: provenance.memberIndex,
-      previousExpiresWorldTime: Number(
-        nativeSummonControlEffectContract(effect).expiresWorldTime,
-      ),
     });
   }
   if (workflow && typeof workflow === "object") {
@@ -2618,7 +2619,6 @@ async function applyNativeSummonControlFromUseCore(item, usageConfig, workflow) 
     return true;
   }
   const now = Number(game.time?.worldTime ?? 0);
-  const expiresWorldTime = now + Number(contract.durationSeconds);
   const receipt = existing && typeof existing === "object"
     ? foundry.utils.deepClone(existing)
     : {
@@ -2633,7 +2633,6 @@ async function applyNativeSummonControlFromUseCore(item, usageConfig, workflow) 
         artifactId: contract.artifactId,
         contractId: contract.contractId,
         startedWorldTime: now,
-        expiresWorldTime,
         completed: [],
         pending: snapshot.members.map(member => member.tokenUuid),
         retry: false,
@@ -2662,25 +2661,8 @@ async function applyNativeSummonControlFromUseCore(item, usageConfig, workflow) 
       throw new Error("Reassert Control lost an exact target control effect after consumption");
     }
     await effect.update({
-      "duration.seconds": Number(contract.durationSeconds),
-      "duration.startTime": now,
-      ["flags." + MODULE_ID + ".nativeSummonControl.expiresWorldTime"]:
-        expiresWorldTime,
       ["flags." + MODULE_ID + ".nativeSummonControl.lastInvocationId"]:
         snapshot.invocationId,
-    });
-    const tokenDocument = await fromUuid(member.tokenUuid).catch(() => null);
-    if (tokenDocument?.documentName !== "Token") {
-      receipt.status = "partial";
-      receipt.retry = false;
-      receipt.error = "token-missing-after-effect-refresh:" + member.tokenUuid;
-      await writeNativeSummonControlReceipt(sourceActor, receipt);
-      workflow.__arcaneNativeSummonControlReceipt = foundry.utils.deepClone(receipt);
-      throw new Error("Reassert Control target Token disappeared after effect refresh");
-    }
-    await nativeSummonWriteFinalProvenance(tokenDocument, {
-      controlEffectUuid: effect.uuid,
-      controlExpiresWorldTime: expiresWorldTime,
     });
     receipt.completed.push({
       tokenUuid: member.tokenUuid,
@@ -2688,8 +2670,6 @@ async function applyNativeSummonControlFromUseCore(item, usageConfig, workflow) 
       effectUuid: member.effectUuid,
       requestId: member.requestId,
       memberIndex: member.memberIndex,
-      previousExpiresWorldTime: member.previousExpiresWorldTime,
-      expiresWorldTime,
     });
     receipt.pending = receipt.pending.filter(uuid => uuid !== member.tokenUuid);
     await writeNativeSummonControlReceipt(sourceActor, receipt);
@@ -2761,6 +2741,31 @@ async function cleanupNativeSummonLifecycleForDeletedToken(token) {
   return true;
 }
 
+async function cleanupNativeSummonChildrenForDeletedToken(token) {
+  if (!isPrimaryAutomationGM()) return true;
+  const parentTokenUuid = String(token?.uuid ?? "").trim();
+  if (!parentTokenUuid) return true;
+  const byScene = new Map();
+  for (const scene of Array.from(game.scenes ?? [])) {
+    const tokenIds = [];
+    for (const child of Array.from(scene?.tokens ?? [])) {
+      const provenance = nativeSummonProvenance(child);
+      if (provenance?.parentTokenUuid !== parentTokenUuid) continue;
+      const tokenId = String(child?.id ?? "").trim();
+      if (tokenId) tokenIds.push(tokenId);
+    }
+    if (tokenIds.length) byScene.set(scene, [...new Set(tokenIds)]);
+  }
+  for (const [scene, tokenIds] of byScene) {
+    try {
+      await scene.deleteEmbeddedDocuments("Token", tokenIds);
+    } catch (_error) {
+      // A concurrent deletion already removed the child Token batch.
+    }
+  }
+  return true;
+}
+
 async function nativeSummonLifecycleEffectForMember(provenance, tokenUuid) {
   const effectUuid = String(provenance?.lifecycleEffectUuid ?? "").trim();
   const memberTokenUuid = String(tokenUuid ?? "").trim();
@@ -2824,11 +2829,115 @@ async function cleanupNativeSummonLifecycleForDefeatedCombatant(combatant) {
   return true;
 }
 
+function nativeSummonControlSourceUuids(actor) {
+  const uuids = new Set();
+  const add = value => {
+    const text = String(value ?? "").trim();
+    if (text) uuids.add(text);
+  };
+  add(actor?.uuid);
+  add(actor?.parent?.uuid);
+  add(actor?.token?.uuid);
+  add(actor?.token?.actor?.uuid);
+  const tokenUuid = String(actor?.token?.uuid ?? "").trim();
+  if (tokenUuid) {
+    add(
+      tokenUuid + ".Actor." + String(
+        actor?.token?.actorId ?? actor?.token?.actor?.id ?? actor?.id ?? "",
+      ),
+    );
+  }
+  const actorId = String(actor?.id ?? "").trim();
+  for (const scene of Array.from(game.scenes ?? [])) {
+    for (const token of Array.from(scene?.tokens ?? [])) {
+      const tokenActor = token?.actor ?? null;
+      if (
+        (actorId && String(token?.actorId ?? "") === actorId)
+        || (actor?.uuid && String(tokenActor?.uuid ?? "") === String(actor.uuid))
+      ) {
+        add(token?.uuid);
+        add(tokenActor?.uuid);
+        if (token?.uuid) {
+          add(
+            String(token.uuid) + ".Actor." + String(
+              token?.actorId ?? tokenActor?.id ?? "",
+            ),
+          );
+        }
+      }
+    }
+  }
+  return uuids;
+}
+
+function nativeSummonControlSourceMatches(provenance, sourceUuids) {
+  const sourceActorUuid = String(provenance?.sourceActorUuid ?? "").trim();
+  const sourceTokenUuid = String(provenance?.sourceTokenUuid ?? "").trim();
+  return Boolean(
+    (sourceActorUuid && sourceUuids.has(sourceActorUuid))
+    || (sourceTokenUuid && sourceUuids.has(sourceTokenUuid))
+  );
+}
+
+async function releaseNativeSummonControlCore(actor) {
+  const sourceUuids = nativeSummonControlSourceUuids(actor);
+  const retained = nativeSummonOwnedTokens((provenance, token) =>
+    provenance.lifecyclePolicy === "retain-entity"
+    && String(provenance.controlContractId ?? "").trim()
+    && nativeSummonControlSourceMatches(provenance, sourceUuids)
+  );
+  for (const { token, provenance } of retained) {
+    const tokenActor = token?.actor;
+    if (!tokenActor) continue;
+    const contractId = String(provenance.controlContractId ?? "").trim();
+    const requestId = String(provenance.requestId ?? "").trim();
+    const effects = Array.from(tokenActor.effects ?? []).filter(effect => {
+      const contract = nativeSummonControlEffectContract(effect);
+      return Boolean(
+        contract
+        && contract.contractId === contractId
+        && (!requestId || contract.requestId === requestId)
+        && contract.tokenUuid === token.uuid
+        && contract.controllerActorUuid === provenance.sourceActorUuid
+        && contract.sourceItemUuid === provenance.sourceItemUuid
+        && contract.artifactId === provenance.artifactId
+      );
+    });
+    if (effects.length) {
+      await tokenActor.deleteEmbeddedDocuments(
+        "ActiveEffect",
+        effects.map(effect => effect.id),
+      );
+    }
+    if (tokenActor.isToken === true) {
+      const current = tokenActor.ownership ?? tokenActor._source?.ownership ?? {};
+      const ownership = { default: 0 };
+      let changed = Number(current.default ?? 0) !== 0;
+      for (const userId of Object.keys(current)) {
+        if (userId === "default") continue;
+        ownership[userId] = 0;
+        if (Number(current[userId] ?? 0) !== 0) changed = true;
+      }
+      if (changed) await tokenActor.update({ ownership });
+    }
+  }
+  return true;
+}
+
+async function releaseNativeSummonControlOnLongRest(actor) {
+  if (!actor || !isPrimaryAutomationGM()) return true;
+  return queueNativeSummonControlActor(
+    actor,
+    () => releaseNativeSummonControlCore(actor),
+  );
+}
+
 async function cleanupNativeSummonLifecycleOnLongRest(actor, result) {
   if (
     (result?.type !== "long" && result?.longRest !== true)
     || !isPrimaryAutomationGM()
   ) return true;
+  await releaseNativeSummonControlOnLongRest(actor);
   const effects = Array.from(actor?.effects ?? []).filter(effect => {
     const contract = nativeSummonEntityLifecycleContract(effect);
     return contract?.sourceActorUuid === actor.uuid;
@@ -5770,42 +5879,6 @@ function blockedActionForActor(actor, item, activity) {
   const isAttack = activity?.type === "attack";
   const isReaction = activationType === "reaction";
   const isAction = activationType === "action";
-  const summonProvenance = actor.flags?.[MODULE_ID]?.nativeSummon;
-  if (
-    summonProvenance?.lifecyclePolicy === "retain-entity"
-    && summonProvenance.controlContractId
-  ) {
-    const activeControl = activeNativeSummonControlEffect(actor, {
-      contractId: summonProvenance.controlContractId,
-      controllerActorUuid: summonProvenance.sourceActorUuid,
-      sourceItemUuid: summonProvenance.sourceItemUuid,
-      artifactId: summonProvenance.artifactId,
-      tokenUuid: summonProvenance.tokenUuid
-        ?? summonProvenance.sourceTokenUuid,
-    }) ?? Array.from(actor.effects ?? []).find(effect => {
-      const control = nativeSummonControlEffectContract(effect);
-      return Boolean(
-        effect.disabled !== true
-        && effect.active !== false
-        && effect.isSuppressed !== true
-        && control
-        && control.contractId === summonProvenance.controlContractId
-        && control.controllerActorUuid === summonProvenance.sourceActorUuid
-        && control.sourceItemUuid === summonProvenance.sourceItemUuid
-        && control.artifactId === summonProvenance.artifactId
-        && Number(control.expiresWorldTime) > Number(game.time?.worldTime ?? 0)
-      );
-    });
-    if (!activeControl) {
-      return {
-        kind: "control-expired",
-        effectId: null,
-        effectName: "Create Undead Control Expired",
-        message: String(actor.name ?? "Summoned creature")
-          + " is no longer under the caster's active Create Undead control.",
-      };
-    }
-  }
   if (!isSpell && !isAttack && !isReaction && !isAction) return null;
   for (const effect of Array.from(actor.effects ?? [])) {
     if (
@@ -8356,6 +8429,206 @@ async function applyHitPointPoolArtifact(
   return created;
 }
 
+function hitPointPoolTokenId(token) {
+  return String(
+    token?.document?.id
+    ?? token?.document?._id
+    ?? token?.id
+    ?? token?._id
+    ?? "",
+  ).trim();
+}
+
+function hostHpPoolSettlementReceipt(workflow) {
+  // First-party web/spell-runtime/hp-pool-runtime.mjs owns pool allocation at
+  // midi-qol.targetingComplete. It settles the pool on the same Workflow and
+  // shrinks workflow.targets before native ApplyDynamicEffects runs. Once the
+  // host marks a Workflow as processed, the receipt is authoritative: this
+  // runtime must not roll or post a second pool card. A successful receipt also
+  // names the real affected tokens so this runtime can apply the compiler
+  // artifact, because the placing Activity does not run native effect transfer
+  // for this pool operation. Malformed receipts fail closed before any effect.
+  if (workflow?.__mtHpPoolProcessed !== true) return null;
+  const malformed = (reason) => {
+    throw new Error(
+      "hit-point-pool-allocator-v1 host settlement receipt is malformed: "
+        + reason,
+    );
+  };
+  const settlement = workflow.__mtHpPool;
+  if (
+    !settlement
+    || typeof settlement !== "object"
+    || Array.isArray(settlement)
+  ) {
+    malformed("__mtHpPool is missing or not an object");
+  }
+  const pool = settlement.pool;
+  if (!pool || typeof pool !== "object" || Array.isArray(pool)) {
+    malformed("pool is missing or not an object");
+  }
+  const formula = typeof pool.formula === "string" ? pool.formula.trim() : "";
+  const castLevel = pool.castLevel;
+  if (typeof pool.formula !== "string") {
+    malformed("formula is not a string");
+  }
+  if (
+    typeof castLevel !== "number"
+    || !Number.isInteger(castLevel)
+    || castLevel < 0
+  ) {
+    malformed("castLevel is not a non-negative integer");
+  }
+  if (!Array.isArray(pool.affected)) malformed("affected is not an array");
+  if (!Array.isArray(pool.skipped)) malformed("skipped is not an array");
+  if (!Array.isArray(settlement.affectedTokens)) {
+    malformed("affectedTokens is not an array");
+  }
+  if (!Array.isArray(settlement.skippedTokens)) {
+    malformed("skippedTokens is not an array");
+  }
+  if (
+    pool.error != null
+    && (typeof pool.error !== "string" || pool.error.trim().length === 0)
+  ) {
+    malformed("error must be a non-empty string");
+  }
+  if (pool.empty !== undefined && typeof pool.empty !== "boolean") {
+    malformed("empty must be a boolean");
+  }
+  const failed = typeof pool.error === "string" && pool.error.trim().length > 0;
+  const empty = pool.empty === true;
+  if (failed && empty) malformed("receipt cannot be both empty and failed");
+  const hasTotal = pool.total !== null && pool.total !== undefined;
+  const hasRemaining = pool.remaining !== null && pool.remaining !== undefined;
+  if (empty) {
+    if (!formula) malformed("empty receipt needs a formula");
+    if (hasTotal || hasRemaining) {
+      malformed("empty receipt must not carry pool totals");
+    }
+    if (
+      pool.affected.length
+      || pool.skipped.length
+      || settlement.affectedTokens.length
+      || settlement.skippedTokens.length
+    ) {
+      malformed("empty receipt must not carry affected or skipped entries");
+    }
+    return { kind: "empty" };
+  }
+  if (failed) {
+    if (hasTotal || hasRemaining) {
+      malformed("failed receipt must null pool totals");
+    }
+    if (pool.affected.length || settlement.affectedTokens.length) {
+      malformed("failed receipt must not carry affected entries");
+    }
+    return { kind: "failed" };
+  }
+  if (!formula) malformed("successful receipt needs a formula");
+  if (
+    typeof pool.total !== "number"
+    || !Number.isFinite(pool.total)
+    || pool.total < 0
+    || typeof pool.remaining !== "number"
+    || !Number.isFinite(pool.remaining)
+    || pool.remaining < 0
+  ) {
+    malformed("successful receipt needs non-negative numeric total and remaining");
+  }
+  if (pool.affected.length !== settlement.affectedTokens.length) {
+    malformed("affected and affectedTokens lengths differ");
+  }
+  const workflowTargets = Array.from(workflow?.targets ?? [])
+    .filter(Boolean);
+  const workflowTargetIds = new Set(
+    workflowTargets.map(hitPointPoolTokenId).filter(Boolean),
+  );
+  const workflowTargetUuids = new Set(
+    workflowTargets
+      .map(target => String(target?.document?.uuid ?? target?.uuid ?? ""))
+      .filter(Boolean),
+  );
+  const seenTokenIds = new Set();
+  const affectedTargets = [];
+  for (let index = 0; index < pool.affected.length; index += 1) {
+    const entry = pool.affected[index];
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      malformed("affected[" + index + "] is not an object");
+    }
+    const tokenId = String(entry.tokenId ?? "").trim();
+    if (!tokenId) malformed("affected[" + index + "] has no tokenId");
+    if (seenTokenIds.has(tokenId)) {
+      malformed("affected[" + index + "] repeats tokenId " + tokenId);
+    }
+    seenTokenIds.add(tokenId);
+    const token = settlement.affectedTokens[index];
+    const actualTokenId = hitPointPoolTokenId(token);
+    if (!actualTokenId || actualTokenId !== tokenId) {
+      malformed(
+        "affectedTokens[" + index + "] id " + (actualTokenId || "?")
+          + " does not match pool.affected[" + index + "] tokenId " + tokenId,
+      );
+    }
+    const actor = token?.actor ?? token?.document?.actor ?? null;
+    if (!actor || typeof actor !== "object") {
+      malformed("affectedTokens[" + index + "] has no actor");
+    }
+    if (!workflowTargetIds.has(tokenId)) {
+      malformed(
+        "affectedTokens[" + index + "] token " + tokenId
+          + " is not in workflow.targets",
+      );
+    }
+    const tokenUuid = String(token?.document?.uuid ?? token?.uuid ?? "");
+    if (
+      !workflowTargets.includes(token)
+      && (!tokenUuid || !workflowTargetUuids.has(tokenUuid))
+    ) {
+      malformed(
+        "affectedTokens[" + index + "] object is not the workflow target",
+      );
+    }
+    affectedTargets.push({ token, actor });
+  }
+  return { kind: "success", affectedTargets };
+}
+
+async function applyHostHpPoolSettlementArtifacts(
+  item,
+  workflow,
+  receipt,
+  artifactId,
+) {
+  const sourceActor = workflow?.actor ?? item?.actor;
+  if (!sourceActor?.uuid) {
+    throw new Error(
+      "hit-point-pool-allocator-v1 host settlement could not resolve source actor",
+    );
+  }
+  if (!String(item?.uuid ?? "").trim()) {
+    throw new Error(
+      "hit-point-pool-allocator-v1 host settlement could not resolve source item",
+    );
+  }
+  const template = await ownedTemplateDocumentForWorkflow(item, workflow);
+  if (!template) {
+    throw new Error(
+      "hit-point-pool-allocator-v1 host settlement could not resolve its owned measured template",
+    );
+  }
+  for (const target of receipt.affectedTargets) {
+    await applyHitPointPoolArtifact(
+      item,
+      sourceActor,
+      target,
+      artifactId,
+    );
+  }
+  await releaseHitPointPoolTemplateSource(item, sourceActor, template);
+  return true;
+}
+
 async function applyHitPointPoolAllocatorFromUse(item, usageConfig, workflow) {
   const semanticActionId = workflowSemanticActionId(workflow);
   const allRules = compilerRuntimeRulesForAdapter(
@@ -8376,6 +8649,14 @@ async function applyHitPointPoolAllocatorFromUse(item, usageConfig, workflow) {
     throw new Error(
       "hit-point-pool-allocator-v1 requires exactly one runtime rule per action",
     );
+  }
+  // The first-party host already rolled, allocated and reshaped this Workflow's
+  // targets. A failed/empty receipt has no artifact to apply; a successful
+  // receipt names the exact affected tokens and lets this runtime materialize
+  // the compiler artifact without rolling or posting another pool card.
+  const hostReceipt = hostHpPoolSettlementReceipt(workflow);
+  if (hostReceipt?.kind === "failed" || hostReceipt?.kind === "empty") {
+    return true;
   }
   const rule = rules[0];
   const operations = (rule.operations ?? []).filter(operationValue =>
@@ -8407,6 +8688,15 @@ async function applyHitPointPoolAllocatorFromUse(item, usageConfig, workflow) {
   if (workflow.__arcaneHitPointPoolAllocatorRules.has(rule.id)) return true;
   workflow.__arcaneHitPointPoolAllocatorRules.add(rule.id);
   try {
+    if (hostReceipt?.kind === "success") {
+      await applyHostHpPoolSettlementArtifacts(
+        item,
+        workflow,
+        hostReceipt,
+        operationValue.artifactId,
+      );
+      return true;
+    }
     const sourceActor = workflow?.actor ?? item?.actor;
     if (!sourceActor) {
       throw new Error("hit-point-pool-allocator-v1 could not resolve source actor");
@@ -15278,7 +15568,7 @@ async function grantBardicInspiration(sourceIdentifier, targetIdentifier, config
     system: {},
     changes: [],
     duration: { seconds: 600 },
-    statuses: [],
+    statuses: [BARDIC_INSPIRATION_STATUS_ID],
     flags: {
       [MODULE_ID]: {
         [BARDIC_INSPIRATION_FLAG]: true,
@@ -15684,7 +15974,7 @@ async function applyDreadAmbusherTurnStart(combat, changed) {
       dae: { specialDuration: ["turnEnd", "combatEnd"], stackable: "noneName", showIcon: true },
       [MODULE_ID]: { dreadAmbusherRoundOne: true },
     },
-    img: "modules/arcane-dnd5e-2014-automation/Nicons/Ability_Ambush.png",
+    img: "modules/arcane-dnd5e-2014-automation/assets/game-icons/lorc/shadow-follower.svg",
     type: "base",
     system: {},
   }]);
@@ -20296,6 +20586,24 @@ function independentProjectileChildWorkflow(workflow) {
   );
 }
 
+function firstPartyProjectileOwnerWorkflow(workflow, usageConfig) {
+  // First-party web/spell-runtime/projectile-runtime.mjs executes the complete
+  // plan itself: the parent shot plus one real completeActivityUse per child.
+  // It stamps __mtProjectileOwner on every usage it creates. Midi composes the
+  // real Workflow.workflowOptions from usage.midiOptions + midiOptions.workflowOptions
+  // (midi-qol.js:7113), so the parent and every child carry the marker there.
+  // The marker means exactly one owner and is usage data, not a global. Only a
+  // workflow that carries it skips this runtime's own projectile orchestration;
+  // ordinary item.use and the runtime's direct path have no marker and are
+  // unchanged.
+  return workflow?.workflowOptions?.__mtProjectileOwner === true
+    || workflow?.options?.__mtProjectileOwner === true
+    || workflow?.options?.workflowOptions?.__mtProjectileOwner === true
+    || workflow?.midiOptions?.__mtProjectileOwner === true
+    || usageConfig?.midiOptions?.__mtProjectileOwner === true
+    || usageConfig?.midiOptions?.workflowOptions?.__mtProjectileOwner === true;
+}
+
 function independentProjectileAllocationFromUse(usageConfig, workflow) {
   const candidates = [
     usageConfig?.arcaneProjectileAllocation,
@@ -20376,6 +20684,7 @@ async function applyIndependentProjectilesFromUse(item, usageConfig, workflow) {
     !workflow
     || workflow.aborted === true
     || independentProjectileChildWorkflow(workflow)
+    || firstPartyProjectileOwnerWorkflow(workflow, usageConfig)
     || !isPrimaryAutomationGM()
   ) return false;
   const resolution = compilerIndependentProjectilesContract(item, workflow);
@@ -20921,6 +21230,18 @@ function patchMidiInstantTemplateRemoval() {
   return true;
 }
 
+Hooks.once("setup", () => {
+  // dnd5e replaces CONFIG.statusEffects in its own setup hook, so the custom
+  // status must be registered at setup, not init.
+  if (!(CONFIG.statusEffects ?? []).some(status => status.id === BARDIC_INSPIRATION_STATUS_ID)) {
+    CONFIG.statusEffects.push({
+      id: BARDIC_INSPIRATION_STATUS_ID,
+      name: "Bardic Inspiration",
+      img: BARDIC_INSPIRATION_STATUS_ICON,
+    });
+  }
+});
+
 Hooks.once("ready", () => {
   patchMidiPersistentTemplateCleanupIsolation();
   patchMidiInstantTemplateRemoval();
@@ -21067,6 +21388,7 @@ Hooks.once("ready", () => {
   });
   Hooks.on("deleteToken", token => {
     const cleanup = async () => {
+      await cleanupNativeSummonChildrenForDeletedToken(token);
       await cleanupNativeSummonCombatantsForDeletedToken(token);
       await cleanupNativeSummonLifecycleForDeletedToken(token);
     };
