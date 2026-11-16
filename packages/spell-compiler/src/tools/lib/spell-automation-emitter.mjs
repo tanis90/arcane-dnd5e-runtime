@@ -1366,6 +1366,7 @@ function createEffect(item, artifact, presentationArtifacts, sourceEffect, {
   additionalArtifactIds = [],
   cleanRoom = false,
   documentUuid,
+  hostModuleId = MODULE_ID,
 } = {}) {
   const presentation = presentationArtifacts.find(current =>
     current.provider === "aura-effects"
@@ -1444,7 +1445,7 @@ function createEffect(item, artifact, presentationArtifacts, sourceEffect, {
         ?? item.img
         ?? "icons/svg/aura.svg"
       );
-  effect.origin = documentUuid ?? `Compendium.${MODULE_ID}.spells.Item.${item._id}`;
+  effect.origin = documentUuid ?? `Compendium.${hostModuleId}.spells.Item.${item._id}`;
   effect.transfer = state.transfer ?? effect.transfer ?? false;
   effect.disabled = state.disabled ?? effect.disabled ?? false;
   effect.statuses = [...(state.statuses ?? effect.statuses ?? [])];
@@ -1982,7 +1983,7 @@ function configureActivityContract(activity, item, action) {
   }
 }
 
-function emitEffects(item, compilation) {
+function emitEffects(item, compilation, hostModuleId = MODULE_ID, originDocumentUuid) {
   const sourceEffects = new Map(
     (item.effects ?? [])
       .filter(current => current?._id)
@@ -2033,7 +2034,8 @@ function emitEffects(item, compilation) {
         artifactsById,
         additionalArtifactIds: [zone.semanticId],
         cleanRoom: compilation.emissionMode === "clean-room",
-        documentUuid: compilation.resourceBindings?.documentUuid,
+        documentUuid: compilation.resourceBindings?.documentUuid ?? originDocumentUuid,
+        hostModuleId,
       },
     );
     applyActiveAurasZone(effect, zone);
@@ -2066,7 +2068,8 @@ function emitEffects(item, compilation) {
       {
         artifactsById,
         cleanRoom: compilation.emissionMode === "clean-room",
-        documentUuid: compilation.resourceBindings?.documentUuid,
+        documentUuid: compilation.resourceBindings?.documentUuid ?? originDocumentUuid,
+        hostModuleId,
       },
     );
     emitted.push(effect);
@@ -2620,7 +2623,7 @@ function cleanRoomSpellItem(compilation) {
   return applyCleanRoomSpellContract(item, compilation);
 }
 
-export function cleanRoomExecutableItemSnapshot(item, {documentUuid} = {}) {
+export function cleanRoomExecutableItemSnapshot(item, {documentUuid, hostModuleId = MODULE_ID} = {}) {
   const snapshot = clone(item);
   const sourceDocumentId = snapshot._id;
   delete snapshot._id;
@@ -2664,7 +2667,7 @@ export function cleanRoomExecutableItemSnapshot(item, {documentUuid} = {}) {
       }
       effectFlags.sourceSpellId = "<spell-document-id>";
     }
-    const expectedOrigin = documentUuid ?? `Compendium.${MODULE_ID}.spells.Item.${sourceDocumentId}`;
+    const expectedOrigin = documentUuid ?? `Compendium.${hostModuleId}.spells.Item.${sourceDocumentId}`;
     const nativeEnchantmentProfile =
       effect.type === "enchantment"
       && effect.origin === null;
@@ -2684,7 +2687,7 @@ export function cleanRoomExecutableItemSnapshot(item, {documentUuid} = {}) {
   return snapshot;
 }
 
-export function emitSpellAutomationItem(sourceItem, compilation, { profile = {} } = {}) {
+export function emitSpellAutomationItem(sourceItem, compilation, { profile = {}, moduleId = MODULE_ID, documentUuid } = {}) {
   if (sourceItem?.system?.identifier !== compilation?.definitionId) {
     throw new Error(
       `Cannot emit ${compilation?.definitionId} into ${sourceItem?.system?.identifier}`,
@@ -2705,7 +2708,7 @@ export function emitSpellAutomationItem(sourceItem, compilation, { profile = {} 
     emitted: effects,
     effectByArtifactId,
     hasActiveAurasZones,
-  } = emitEffects(item, compilation);
+  } = emitEffects(item, compilation, moduleId, documentUuid);
   item.effects = effects;
   item.system.activities = emitActivities(item, compilation, effectByArtifactId);
   if (hasActiveAurasZones) configureActiveAurasTemplateItem(item);
@@ -2803,7 +2806,7 @@ export function emitSpellAutomationItem(sourceItem, compilation, { profile = {} 
   };
   if (compilation.emissionMode === "clean-room") {
     item.flags[MODULE_ID].compiler.executableHash = semanticHash(
-      cleanRoomExecutableItemSnapshot(item, {documentUuid: compilation.resourceBindings?.documentUuid}),
+      cleanRoomExecutableItemSnapshot(item, {documentUuid: compilation.resourceBindings?.documentUuid ?? documentUuid, hostModuleId: moduleId}),
     );
   }
 
