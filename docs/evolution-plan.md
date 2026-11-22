@@ -35,7 +35,7 @@ Deliverables:
 - `createDnd5eRuntime()` with a manifest and explicit `initialize(host)`
   delegation; `createAuto2014Runtime` is only a compatibility alias.
 - Reviewed full source baseline and deterministic `dist/` build.
-- Real Node `vm` tests comparing the full initializer's 54 hook registrations and
+- Real Node `vm` tests comparing the full initializer's 55 hook registrations and
   163 API keys exactly with the current complete runtime, plus self-identity,
   idempotency, rollback, ready API, setup-time status registration and
   long-rest behavior.
@@ -97,7 +97,7 @@ Do not cut over on unit tests alone. Required evidence:
 - complete Auto2014 regression suite (the current 1220-case chain);
 - R3 six-spell and long-rest gates, including Aid/Warding Bond/Death Ward/
   Heroism/Heroes' Feast/Harm cleanup behavior;
-- all 54 complete-runtime hook registrations and 163 API keys present;
+- all 55 complete-runtime hook registrations and 163 API keys present;
 - real GM plus non-GM player dual-client gate with actual HP/effects/slots;
 - reload and rollback checks;
 - a diff showing the VTT adapter, not the rule implementation, is the only

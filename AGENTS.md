@@ -35,7 +35,7 @@
 
 ## Owner 证据与回执
 
-- owner 提供真实 initializer/API/hook/DSL/compiler 的独立安装、构建、测试与 owner 回执证据；至少覆盖 54 hook registrations、163 API keys、确定性 build、rollback、legacy ownership、compiler DSL → runtimePlan → availability。
+- owner 提供真实 initializer/API/hook/DSL/compiler 的独立安装、构建、测试与 owner 回执证据；至少覆盖 55 hook registrations、163 API keys、确定性 build、rollback、legacy ownership、compiler DSL → runtimePlan → availability。
 - 真实 CI receipt 至少绑定完整 commit、`unit`/manifest identity（包版本、`schemaVersion`、`moduleId`、`contentPolicy`）与 artifact（`artifactHash`/`buildHash`）；前端 lock 再聚合 `manifestHash`、`hostApi`、`runtimeSdkApi`，不得只给 `result: "passed"`。
 - release 身份：正式 A 类出件必须是 `release.tag`（自受保护 main 切出的 `release-*` tag）；完整 40 位 commit 只作证据/诊断与 CI 内部绑定，**不是**前端正式消费坐标，也不得替代 `release.tag`。禁止 `main`、`latest`、短 hash。`owner-ci.yml` 的 `testedCommit` 当前只接受完整 40-hex，传 tag 前必须先解析成 commit。
 - 本地或非 Actions 运行只能得到 `runUrl: null`，不得冒充 CI 回执；任一步失败都不得写出 `result: "passed"`。

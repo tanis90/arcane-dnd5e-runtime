@@ -78,7 +78,7 @@ from a stale container or a spell-only projection. The reviewed record lives in
 `packages/dnd5e-runtime/src/source-baseline.json`:
 
 - Copied source SHA256:
-  `581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d`.
+  `1459e6507fc9dc2400d324c8303f488a2908b832d916e1dea260e1c06145a71a`.
 - Upstream commit:
   `f91719cf19cc8208e7568c6d31b1e18c3e43deab`.
 - Upstream source SHA256:
@@ -111,8 +111,29 @@ The complete source retains these tested differences:
    `workflowOptions`/usage paths, so the first-party projectile runtime remains
    the only orchestrator for the workflows it creates. The runtime direct path,
    child guard and receipts are unchanged.
+6. `executeCompilerZoneEventActivity` marks its hidden compiler pulse use with
+   `midiOptions.workflowOptions.noOnUseMacro = true`. Midi reads OnUse macros
+   from the whole Item (and the actor) and the compiler installs the ActiveAuras
+   template binder at Item level for the cast that places the zone template. The
+   pulse owns no template, so re-running that binder there raised
+   `ActiveAuras template provenance is unavailable` and skipped the pulse's
+   native save/damage. The pulse still completes its own hidden activity, and
+   ordinary casts, following-aura pulses and every other
+   `completeActivityUse` path keep their macros. Compiler pulses carry no
+   legitimate OnUse macro on the Item or actor scope; that is the accepted
+   boundary of this flag.
+7. `preDeleteMeasuredTemplate` sets `options.noConcentrationCheck = true` only
+   for compiler persistent zone templates
+   (`isCompilerPersistentAuraTemplate`: an ActiveAuras aura entry with
+   `persistentTemplate` and compiler artifact ids). Midi's
+   `checkDeleteTemplate` deletes the dependent source effect, and with it
+   concentration, once the last dependent template is gone. Compiler zones are
+   owned by the existing `deleteMeasuredTemplate` membership cleanup and TimesUp,
+   so template deletion keeps concentration. Non-compiler templates keep Midi's
+   native behaviour and `cleanupCompilerZoneMembershipOnTemplateDelete` is
+   unchanged.
 
-The full runtime test baseline contains 54 hook registrations (48 unique names)
+The full runtime test baseline contains 55 hook registrations (49 unique names)
 and 163 API keys. It is stored in
 `packages/dnd5e-runtime/tests/fixtures/full-runtime-baseline.json`; the VM test
 executes both the raw current runtime and the generated initializer and compares

@@ -38,7 +38,7 @@ test('createDnd5eRuntime exposes the full manifest and initializer without touch
   assert.equal(globalThis.game, undefined);
   const sdk = await createDnd5eRuntime();
   assert.equal(globalThis.game, undefined);
-  assert.equal(SDK_VERSION, '0.1.3');
+  assert.equal(SDK_VERSION, '0.1.4');
   assert.equal(packageJson.version, SDK_VERSION);
   assert.equal(packageJson.name, '@arcanedesk/dnd5e-runtime');
   assert.equal(SDK_ENGINES.node, '>=22.12');
@@ -111,7 +111,7 @@ test('the public host contract executes the full runtime and matches the baselin
   const runtime = await sdk.initialize(host);
   assert.equal(runtime.mode, 'standalone');
   host.triggerReady();
-  assert.equal(host.hookNames().length, 54);
+  assert.equal(host.hookNames().length, 55);
   assert.deepEqual(host.hookNames(), expectedKeys.hookNames);
   assert.deepEqual(host.apiKeys(), expectedKeys.apiKeys);
   assert.equal(host.apiKeys().length, 163);
@@ -141,6 +141,6 @@ test('full manifest and build are deterministic across repeated calls', async ()
   assert.equal(first.initializer.source, second.initializer.source);
   const [a, b] = await Promise.all([buildDnd5eRuntime(), buildDnd5eRuntime()]);
   assert.equal(a.source, b.source);
-  assert.equal(expectedKeys.hookCount, 54);
+  assert.equal(expectedKeys.hookCount, 55);
   assert.equal(expectedKeys.apiCount, 163);
 });

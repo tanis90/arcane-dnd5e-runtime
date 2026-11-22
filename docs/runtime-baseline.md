@@ -9,16 +9,34 @@ and spell hooks/API entries.
 The canonical machine-readable baseline is
 `packages/dnd5e-runtime/tests/fixtures/full-runtime-baseline.json`:
 
-- 54 hook registrations
-- 48 unique hook names
+- 55 hook registrations
+- 49 unique hook names
 - 163 API keys
 - source SHA256:
-  `581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d`
+  `1459e6507fc9dc2400d324c8303f488a2908b832d916e1dea260e1c06145a71a`
 
-The 54-registration baseline is the persistent post-ready set. The browser
+The 55-registration baseline is the persistent post-ready set. The browser
 runtime also registers one one-shot `setup` callback that adds the Bardic
 Inspiration status; it is consumed before the snapshot and is not counted as a
-55th persistent hook.
+56th persistent hook.
+
+## Reviewed source differences
+
+The reviewed differences from the upstream copy are recorded in
+`packages/dnd5e-runtime/src/source-baseline.json` and summarized in
+`MIGRATION.md`. They cover the `longRestCleanup` shim, the Bardic Inspiration
+status, the Dread Ambusher icon path, the first-party HP-pool and projectile
+ownership handshakes, the compiler zone pulse macro isolation and the compiler
+zone template deletion rule. The hidden compiler pulse passes
+`workflowOptions.noOnUseMacro = true` so the Item-level ActiveAuras template
+binder installed for the placing cast is not re-run without template
+provenance; the pulse's own native save/damage still resolves and ordinary
+spell uses keep their OnUse macros. `preDeleteMeasuredTemplate` sets
+`options.noConcentrationCheck = true` only for compiler persistent zone
+templates, so deleting one keeps the caster's concentration (the runtime's
+membership cleanup and TimesUp own that lifecycle) while non-compiler templates
+keep Midi's native deletion behaviour. The added hook is why the persistent
+baseline is 55 registrations and 49 unique names.
 
 The VM test executes the raw current runtime and the generated initializer and
 compares both complete sorted lists. No projection is applied.

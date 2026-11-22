@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "sourceSha256": "581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d",
-  "hookCount": 54,
+  "sourceSha256": "1459e6507fc9dc2400d324c8303f488a2908b832d916e1dea260e1c06145a71a",
+  "hookCount": 55,
   "hookNames": [
     "canvasReady",
     "combatEnd",
@@ -48,6 +48,7 @@
     "preCreateActiveEffect",
     "preCreateItem",
     "preDeleteActiveEffect",
+    "preDeleteMeasuredTemplate",
     "renderActorDirectory",
     "renderActorDirectory5e",
     "renderApplicationV2",
