@@ -74,7 +74,7 @@ browser initializer. The SDK entry is a Node build-time module; the emitted
 connect to a world, register hooks or evaluate code.
 
 `createAuto2014Runtime` remains a compatibility alias for `createDnd5eRuntime`.
-It is the same full runtime, not a separate mode. The exact 54-hook/163-API
+It is the same full runtime, not a separate mode. The exact 55-hook/163-API
 baseline, artifact path, manifest fields and self-identity rules are recorded in
 `docs/runtime-baseline.md`.
 
@@ -127,7 +127,7 @@ npm pack --dry-run --workspace @arcanedesk/dnd5e-runtime
 `npm run build` writes `packages/dnd5e-runtime/dist/dnd5e-runtime.mjs` and
 `packages/dnd5e-runtime/dist/manifest.json`. Both are generated artifacts and
 must not be edited by hand. `npm test` executes the complete initializer in a
-real Node `vm`, compares its 54 hook registrations and 163 API keys exactly
+real Node `vm`, compares its 55 hook registrations and 163 API keys exactly
 against the reviewed current-runtime baseline, compiles the original mechanism
 fixture, checks rollback and legacy ownership, and audits the repository plus
 every package tarball.
@@ -194,12 +194,13 @@ here; callers pass their own acceptance source.
 - Upstream public source: `tanis90/arcanedesk-fvtt-mods`
   at `f91719cf19cc8208e7568c6d31b1e18c3e43deab`.
 - Runtime source baseline: SHA256
-  `581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d`.
+  `1459e6507fc9dc2400d324c8303f488a2908b832d916e1dea260e1c06145a71a`.
 - The upstream runtime file at that commit has SHA256
   `83e5edbe453ea0e8e61e9a95852c2fc8a4ff746c996f93bec7c51f56d509c54d`.
 - The complete source retains the `longRestCleanup` reversible-hit-point
   compatibility shim, the first-party HP-pool/projectile handshakes, the
-  Bardic Inspiration visibility status and the Dread Ambusher game-icons path.
+  compiler zone pulse macro isolation, the Bardic Inspiration visibility status
+  and the Dread Ambusher game-icons path.
   These are part of the full runtime baseline, not a projection exception.
 
 ## Scope and limitations

@@ -35,16 +35,16 @@ test('full initializer matches the current complete runtime hooks and API keys e
   const rawHost = await executeRawFull(rawSource);
   assert.deepEqual(rawHost.hookNames(), fixture.hookNames);
   assert.deepEqual(rawHost.apiKeys(LEGACY_MODULE_ID), fixture.apiKeys);
-  assert.equal(rawHost.hookNames().length, 54);
-  assert.equal(fixture.hookNames.length, 54);
+  assert.equal(rawHost.hookNames().length, 55);
+  assert.equal(fixture.hookNames.length, 55);
   assert.equal(fixture.apiKeys.length, 163);
-  assert.equal(new Set(fixture.hookNames).size, 48);
+  assert.equal(new Set(fixture.hookNames).size, 49);
 
   const {host, runtime} = await executeFullSource(built.source);
   assert.equal(runtime.mode, 'standalone');
   assert.deepEqual(host.hookNames(), rawHost.hookNames());
   assert.deepEqual(host.apiKeys(LEGACY_MODULE_ID), rawHost.apiKeys(LEGACY_MODULE_ID));
-  assert.equal(host.hookNames().length, 54);
+  assert.equal(host.hookNames().length, 55);
   assert.equal(host.apiKeys().length, 163);
   for (const name of ['getSceneControlButtons', 'renderApplicationV2', 'renderActorDirectory',
     'renderActorDirectory5e', 'preCreateItem', 'createItem', 'dnd5e.preRollInitiative',

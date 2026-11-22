@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sha256": "581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d",
+  "sha256": "1459e6507fc9dc2400d324c8303f488a2908b832d916e1dea260e1c06145a71a",
   "source": {
     "path": "src/automation.js",
     "origin": "Current tested complete VTT runtime copy"
@@ -12,7 +12,7 @@
   },
   "review": {
     "status": "manually-reviewed",
-    "reviewedOn": "2026-11-06",
+    "reviewedOn": "2026-11-19",
     "refreshPolicy": "manual-only",
     "note": "Never refresh this hash automatically in CI. This is the complete runtime baseline; it is wrapped as a full initializer without hook or API projection."
   },
@@ -36,6 +36,14 @@
     {
       "name": "First-party independent-projectile ownership handshake",
       "summary": "applyIndependentProjectilesFromUse skips its own projectile chain only when the real workflowOptions (or usage midiOptions) carries __mtProjectileOwner, which first-party projectileCastUsage sets on the parent and every child. The runtime direct path, its child guard and receipts are unchanged."
+    },
+    {
+      "name": "Compiler zone pulse macro isolation",
+      "summary": "executeCompilerZoneEventActivity marks its hidden compiler pulse use with midiOptions.workflowOptions.noOnUseMacro = true. Midi reads OnUse macros from the whole Item (and actor), and the compiler installs the ActiveAuras template binder at Item level for the cast that places the zone template; the pulse owns no template, so re-running that binder there threw 'ActiveAuras template provenance is unavailable' and skipped the native save/damage. The pulse still resolves its own hidden save/damage activity, ordinary cast and following-aura paths keep their macros, and a compiler pulse carries no legitimate OnUse macro on either scope, which is the accepted boundary."
+    },
+    {
+      "name": "Compiler zone template deletion keeps concentration",
+      "summary": "preDeleteMeasuredTemplate sets options.noConcentrationCheck = true only when isCompilerPersistentAuraTemplate(templateDocument) is true, i.e. an ActiveAuras aura entry with persistentTemplate and compiler artifact ids. Midi's checkDeleteTemplate deletes the dependent source effect, and therefore concentration, when the last dependent template is deleted; compiler persistent zones are owned by the existing deleteMeasuredTemplate membership cleanup and TimesUp expiry instead. Non-compiler templates keep Midi's native behaviour, and cleanupCompilerZoneMembershipOnTemplateDelete is unchanged."
     }
   ]
 }

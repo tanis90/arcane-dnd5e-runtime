@@ -14782,6 +14782,16 @@ async function executeCompilerZoneEventActivity(
           targetsToUse: new Set([targetToken]),
           ignoreUserTargets: true,
           fastForward: true,
+          // The hidden pulse owns no template. Its Item-level ActiveAuras binder
+          // exists for the cast that places the template, so running OnUse
+          // macros here would re-execute that binder without template
+          // provenance. The native save/damage of this activity is the whole
+          // mechanic, so opt this dispatch out of OnUse macros. The flag is
+          // Item- and actor-scoped in Midi; compiler pulses carry no legitimate
+          // macro on either, which is the accepted boundary.
+          workflowOptions: {
+            noOnUseMacro: true,
+          },
         },
       });
       if (!workflow || workflow.aborted === true) {
@@ -21620,6 +21630,16 @@ Hooks.once("ready", () => {
     refreshCompilerZoneTemplateMembership(template, changed, options, userId).catch(error => {
       console.warn("[" + MODULE_ID + "] Compiler zone template refresh failed", error);
     });
+  });
+  Hooks.on("preDeleteMeasuredTemplate", (template, options) => {
+    // Midi's deleteMeasuredTemplate pass deletes the dependent source effect,
+    // and with it concentration, once the last dependent template is gone.
+    // Compiler persistent zones own their lifecycle through the runtime
+    // cleanup and TimesUp, so template deletion must not end concentration.
+    // noConcentrationCheck is the public Midi option for exactly that.
+    if (options && isCompilerPersistentAuraTemplate(template)) {
+      options.noConcentrationCheck = true;
+    }
   });
   Hooks.on("deleteMeasuredTemplate", template => {
     cleanupCompilerZoneMembershipOnTemplateDelete(template).catch(error => {

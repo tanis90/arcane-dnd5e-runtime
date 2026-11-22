@@ -1,6 +1,6 @@
 {
   "name": "@arcanedesk/dnd5e-runtime",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "schemaVersion": 1,
   "runtimeKind": "full",
   "factoryName": "initializeDnd5eRuntime",
@@ -19,21 +19,21 @@
   "moduleId": "arcane-dnd5e-2014-automation",
   "source": {
     "path": "src/automation.js",
-    "bytes": 792113,
-    "sha256": "581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d"
+    "bytes": 793276,
+    "sha256": "1459e6507fc9dc2400d324c8303f488a2908b832d916e1dea260e1c06145a71a"
   },
-  "sourceHash": "581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d",
+  "sourceHash": "1459e6507fc9dc2400d324c8303f488a2908b832d916e1dea260e1c06145a71a",
   "artifact": {
     "path": "dist/dnd5e-runtime.mjs",
-    "bytes": 795925,
-    "sha256": "1b15319f8484b37d4c43998a3e38c15fb1c724fcb3a2c473ac11dcdfe7ddc864"
+    "bytes": 797088,
+    "sha256": "6d7c34143dbd98bfa551cb08a6cc62b70de0a68ba651528a87287b2bb1068e72"
   },
-  "buildHash": "1b15319f8484b37d4c43998a3e38c15fb1c724fcb3a2c473ac11dcdfe7ddc864",
+  "buildHash": "6d7c34143dbd98bfa551cb08a6cc62b70de0a68ba651528a87287b2bb1068e72",
   "contentPolicy": "runtime-only",
   "contentPolicySummary": "Complete DND5E 2014 runtime mechanics only; no spell descriptions, compendium documents, images, translations or world state.",
   "baseline": {
     "path": "src/source-baseline.json",
-    "sha256": "397b7c7a572501c6f1724f8446875d8707390337d260871c34c3b451c8a7a859",
+    "sha256": "7a7661b8e493ed485b1e3f5955b64d6ce661ff325919f5dde939b1f29df3b600",
     "refreshPolicy": "manual-only"
   },
   "provenance": {
@@ -41,13 +41,15 @@
     "upstreamCommit": "f91719cf19cc8208e7568c6d31b1e18c3e43deab",
     "upstreamSourceSha256": "83e5edbe453ea0e8e61e9a95852c2fc8a4ff746c996f93bec7c51f56d509c54d",
     "testedRuntimeOrigin": "Current tested complete VTT runtime copy",
-    "testedRuntimeSha256": "581b0b651386438ef325754cbf9bf07fbc287a9b440cc798d908676ed7ddb86d",
+    "testedRuntimeSha256": "1459e6507fc9dc2400d324c8303f488a2908b832d916e1dea260e1c06145a71a",
     "reviewedDifferences": [
       "longRestCleanup compatibility shim",
       "Bardic Inspiration visibility status",
       "Dread Ambusher effect icon",
       "First-party HP pool ownership handshake",
-      "First-party independent-projectile ownership handshake"
+      "First-party independent-projectile ownership handshake",
+      "Compiler zone pulse macro isolation",
+      "Compiler zone template deletion keeps concentration"
     ]
   },
   "generatedBy": "scripts/build.mjs"
